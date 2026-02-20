@@ -1,5 +1,6 @@
 part of '../tripeaks_engine.dart';
 
+/// Config for additive match-level scoring outside round mechanics.
 final class MatchScoreConfig {
   /// Creates a match score config.
   const MatchScoreConfig({

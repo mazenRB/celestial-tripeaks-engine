@@ -1,5 +1,9 @@
 part of '../tripeaks_engine.dart';
 
+/// Immutable multi-round TriPeaks session state snapshot.
+///
+/// This wraps one active round plus completed round history and aggregate
+/// counters such as wins/losses/aborts.
 final class TriPeaksSessionState {
   /// Default deterministic session seed used when no explicit seed is provided.
   static const int defaultSeed = 0;

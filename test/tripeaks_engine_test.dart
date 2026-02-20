@@ -1646,6 +1646,59 @@ void main() {
   });
 
   group('Serialization', () {
+    test('bonus slots config map is stable (golden)', () {
+      const config = BonusSlotsConfig(
+        enabled: true,
+        spawnPolicy: BonusSlotSpawnPolicy.tierFixedRank,
+        defaultAnchorTierWhenUnknown: BonusSlotAnchorTier.high,
+        lowTierAnchorRank: Rank.eight,
+        highTierAnchorRank: Rank.king,
+        jokerAcceptsAnyRank: false,
+        jokerConsumedOnFirstUse: true,
+        spawnOnOpenSlot2AtStreak: 3,
+        spawnOnOpenSlot3AtStreak: 6,
+        closeOnDraw: true,
+        closeOnInvalidAction: true,
+        maxSlots: 3,
+      );
+      expect(
+        config.toMap(),
+        equals(
+          <String, dynamic>{
+            'schemaVersion': 1,
+            'type': 'bonus_slots_config',
+            'enabled': true,
+            'spawnPolicy': 'tierFixedRank',
+            'defaultAnchorTierWhenUnknown': 'high',
+            'lowTierAnchorRank': 'eight',
+            'highTierAnchorRank': 'king',
+            'jokerAcceptsAnyRank': false,
+            'jokerConsumedOnFirstUse': true,
+            'spawnOnOpenSlot2AtStreak': 3,
+            'spawnOnOpenSlot3AtStreak': 6,
+            'closeOnDraw': true,
+            'closeOnInvalidAction': true,
+            'maxSlots': 3,
+          },
+        ),
+      );
+    });
+
+    test('anchor card map is stable (golden)', () {
+      const anchor = Card.anchor(Rank.queen);
+      expect(
+        anchor.toMap(),
+        equals(
+          <String, dynamic>{
+            'schemaVersion': 1,
+            'type': 'card',
+            'cardKind': 'anchor',
+            'rank': 'queen',
+          },
+        ),
+      );
+    });
+
     test('round state map round-trip preserves deep state', () {
       final original = TriPeaksState.newGame(
         seed: 5,
@@ -1784,6 +1837,25 @@ void main() {
         DecodeFailureCode.unsupportedSchemaVersion,
       );
     });
+
+    test('replay map includes tierFixedRank bonus config deterministically',
+        () {
+      final replay = TriPeaksReplay.newSession(
+        seed: 7,
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.tierFixedRank,
+          defaultAnchorTierWhenUnknown: BonusSlotAnchorTier.low,
+          lowTierAnchorRank: Rank.six,
+          highTierAnchorRank: Rank.queen,
+        ),
+      );
+      final map = replay.toMap();
+      final bonus = map['bonusSlotsConfig'] as Map<String, dynamic>;
+      expect(bonus['spawnPolicy'], 'tierFixedRank');
+      expect(bonus['defaultAnchorTierWhenUnknown'], 'low');
+      expect(bonus['lowTierAnchorRank'], 'six');
+      expect(bonus['highTierAnchorRank'], 'queen');
+    });
   });
 
   group('Fingerprint', () {
@@ -1808,6 +1880,34 @@ void main() {
   });
 
   group('Save/Load', () {
+    test('tierFixedRank round save/load keeps anchor state and fingerprint',
+        () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.tierFixedRank,
+          lowTierAnchorRank: Rank.six,
+          highTierAnchorRank: Rank.queen,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+      expect(state.bonusSlotsState.slots[1].single.isAnchor, isTrue);
+
+      final save = encodeSaveRound(state, savedAtSequence: 3);
+      final loaded = decodeSaveRound(save);
+      expect(loaded.isSuccess, isTrue);
+      expect(
+        loaded.value!.state.bonusSlotsState.slots[1].single.isAnchor,
+        isTrue,
+      );
+      expect(
+        stateFingerprint(loaded.value!.state),
+        stateFingerprint(state),
+      );
+    });
+
     test('round save round-trip preserves state and fingerprint', () {
       final initial = TriPeaksState.newGame(
         seed: 17,

@@ -1,5 +1,6 @@
 part of '../tripeaks_engine.dart';
 
+/// Reduces a multi-round session [state] by [action], throwing on failures.
 TriPeaksSessionState reduceTriPeaksSession(
   TriPeaksSessionState state,
   TriPeaksSessionAction action, {

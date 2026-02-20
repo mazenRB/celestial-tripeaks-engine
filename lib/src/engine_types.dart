@@ -1,5 +1,6 @@
 part of '../tripeaks_engine.dart';
 
+/// Typed round-level reducer error codes.
 enum TriPeaksErrorCode {
   invalidTableauIndex,
   tableauCardNotRemovable,

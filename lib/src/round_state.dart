@@ -1,5 +1,9 @@
 part of '../tripeaks_engine.dart';
 
+/// Immutable single-round TriPeaks state snapshot.
+///
+/// All reducers return new instances of this state to keep transitions
+/// deterministic and replay-safe.
 final class TriPeaksState {
   /// Default deterministic seed used when no explicit seed is provided.
   static const int defaultSeed = 0;

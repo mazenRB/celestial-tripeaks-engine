@@ -1,5 +1,6 @@
 part of '../tripeaks_engine.dart';
 
+/// Reduces [state] by [action], throwing on invalid actions.
 TriPeaksState reduceTriPeaks(
   TriPeaksState state,
   TriPeaksAction action, {

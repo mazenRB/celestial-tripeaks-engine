@@ -1,5 +1,8 @@
 part of '../tripeaks_engine.dart';
 
+/// Returns all currently playable exposed tableau indices.
+///
+/// This is a read-only query and does not mutate [state].
 List<int> getPlayableMoves(
   TriPeaksState state,
   RoundRulesConfig rulesConfig,
