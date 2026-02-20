@@ -15,6 +15,7 @@ part 'src/save.dart';
 part 'src/query.dart';
 part 'src/match_room.dart';
 part 'src/match_competitive.dart';
+part 'src/match_finalization.dart';
 part 'src/server_authority.dart';
 part 'src/round_reducer.dart';
 part 'src/session_reducer.dart';

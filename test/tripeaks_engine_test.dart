@@ -48,14 +48,17 @@ void main() {
       );
     });
 
-    test('ace and king are not adjacent by default', () {
+    test('ace and king are not adjacent when wrap is disabled', () {
       final deck = _buildDeck(
         tableauOverrides: <int, Card>{
           18: const Card(Rank.ace, Suit.spades),
         },
         waste: const Card(Rank.king, Suit.hearts),
       );
-      final state = TriPeaksState.newGame(deck: deck);
+      final state = TriPeaksState.newGame(
+        deck: deck,
+        roundRulesConfig: const RoundRulesConfig(aceKingWrapAround: false),
+      );
 
       expect(state.canRemoveTableau(18), isFalse);
     });
@@ -382,6 +385,72 @@ void main() {
       expect(state.streakState.lastActionTick, 1);
     });
 
+    test('stale strike expiry token is ignored deterministically', () {
+      var state = TriPeaksState.newGame(deck: _buildStreakUnlockDeck());
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+      final staleToken = state.strikeTimerState.deadlineToken;
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+      final before = state.toMap();
+
+      final result = tryReduceTriPeaks(
+        state,
+        StrikeTimerExpiredAction(deadlineToken: staleToken),
+      );
+
+      expect(result.isSuccess, isFalse);
+      expect(
+        result.error?.code,
+        TriPeaksErrorCode.staleStrikeTimerExpiry,
+      );
+      expect(result.scoreDelta, 0);
+      expect(result.state.toMap(), equals(before));
+    });
+
+    test('valid strike expiry ends streak and closes bonus slots', () {
+      var state = TriPeaksState.newGame(deck: _buildStreakUnlockDeck());
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+
+      expect(state.streakState.currentStreak, 3);
+      expect(state.bonusSlotsState.openSlotsCount, 2);
+      expect(state.strikeTimerState.isArmed, isTrue);
+
+      state = reduceTriPeaks(
+        state,
+        StrikeTimerExpiredAction(
+          deadlineToken: state.strikeTimerState.deadlineToken,
+        ),
+      );
+
+      expect(state.streakState.currentStreak, 0);
+      expect(state.bonusSlotsState.openSlotsCount, 1);
+      expect(state.strikeTimerState.isArmed, isFalse);
+    });
+
+    test('streak advance resets strike deadline token', () {
+      var state = TriPeaksState.newGame(deck: _buildStreakUnlockDeck());
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+      final firstToken = state.strikeTimerState.deadlineToken;
+      expect(state.strikeTimerState.isArmed, isTrue);
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+      final secondToken = state.strikeTimerState.deadlineToken;
+      expect(secondToken, isNot(firstToken));
+
+      final staleResult = tryReduceTriPeaks(
+        state,
+        StrikeTimerExpiredAction(deadlineToken: firstToken),
+      );
+      expect(staleResult.isSuccess, isFalse);
+      expect(
+        staleResult.error?.code,
+        TriPeaksErrorCode.staleStrikeTimerExpiry,
+      );
+    });
+
     test('tryReduce returns typed error on invalid tableau index', () {
       final state = TriPeaksState.newGame(seed: 8);
 
@@ -442,6 +511,393 @@ void main() {
       expect(stateA.tableau, equals(stateB.tableau));
       expect(stateA.waste, equals(stateB.waste));
       expect(stateA.stock, equals(stateB.stock));
+    });
+
+    test('clearing one peak awards peak bonus exactly once', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildPeakBonusDeck(),
+        scoreConfig: const ScoreConfig(
+          pointsTableauToWaste: 0,
+          pointsPeakCleared: 50,
+        ),
+      );
+
+      for (final index in <int>[18, 19, 20, 21, 9, 10, 11, 3, 4, 0]) {
+        state = reduceTriPeaks(state, RemoveTableauCardAction(index));
+      }
+      expect(state.clearedPeaksAwarded, equals(<int>{0}));
+      expect(state.scoreState.totalScore, 50);
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(22));
+      expect(state.clearedPeaksAwarded, equals(<int>{0}));
+      expect(state.scoreState.totalScore, 50);
+    });
+
+    test('clearing remaining peaks awards additional peak bonuses', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildPeakBonusDeck(),
+        scoreConfig: const ScoreConfig(
+          pointsTableauToWaste: 0,
+          pointsPeakCleared: 50,
+        ),
+      );
+
+      for (final index in <int>[
+        18, 19, 20, 21, 9, 10, 11, 3, 4, 0, // peak 0
+        22, 23, 24, 12, 13, 14, 6, 5, 1, // peak 1
+        25, 26, 27, 17, 16, 15, 8, 7, 2, // peak 2
+      ]) {
+        state = reduceTriPeaks(state, RemoveTableauCardAction(index));
+      }
+
+      expect(state.clearedPeaksAwarded, equals(<int>{0, 1, 2}));
+      expect(state.scoreState.totalScore, 150);
+    });
+
+    test('undo restores peak bonus score and awarded tracking', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildPeakBonusDeck(),
+        scoreConfig: const ScoreConfig(
+          pointsTableauToWaste: 0,
+          pointsPeakCleared: 50,
+        ),
+        undoConfig: const UndoConfig(enabled: true, maxSteps: 20),
+      );
+
+      for (final index in <int>[18, 19, 20, 21, 9, 10, 11, 3, 4, 0]) {
+        state = reduceTriPeaks(state, RemoveTableauCardAction(index));
+      }
+      expect(state.scoreState.totalScore, 50);
+      expect(state.clearedPeaksAwarded, equals(<int>{0}));
+
+      state = reduceTriPeaks(state, const UndoAction());
+
+      expect(state.scoreState.totalScore, 0);
+      expect(state.clearedPeaksAwarded, isEmpty);
+      expect(state.removed[0], isFalse);
+    });
+
+    test('no peak bonus is awarded when pointsPeakCleared is zero', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildPeakBonusDeck(),
+        scoreConfig: const ScoreConfig(
+          pointsTableauToWaste: 0,
+          pointsPeakCleared: 0,
+        ),
+      );
+
+      for (final index in <int>[18, 19, 20, 21, 9, 10, 11, 3, 4, 0]) {
+        state = reduceTriPeaks(state, RemoveTableauCardAction(index));
+      }
+      expect(state.clearedPeaksAwarded, equals(<int>{0}));
+      expect(state.scoreState.totalScore, 0);
+    });
+
+    test('bonus slots unlock at streak thresholds 2->1, 3->2, 6->3', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.joker,
+          spawnOnOpenSlot2AtStreak: 3,
+          spawnOnOpenSlot3AtStreak: 6,
+        ),
+      );
+      expect(state.bonusSlotsState.openSlotsCount, 1);
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      expect(state.streakState.currentStreak, 2);
+      expect(state.bonusSlotsState.openSlotsCount, 1);
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+      expect(state.streakState.currentStreak, 3);
+      expect(state.bonusSlotsState.openSlotsCount, 2);
+      expect(state.bonusSlotsState.slots[1].single.isJoker, isTrue);
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(21));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(22));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(23));
+      expect(state.streakState.currentStreak, 6);
+      expect(state.bonusSlotsState.openSlotsCount, 3);
+      expect(state.bonusSlotsState.slots[2].single.isJoker, isTrue);
+    });
+
+    test('tierFixedRank spawns low-tier anchor after low-tier streak unlock',
+        () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.tierFixedRank,
+          lowTierAnchorRank: Rank.six,
+          highTierAnchorRank: Rank.queen,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+
+      final slot2Top = state.bonusSlotsState.slots[1].single;
+      expect(slot2Top.isAnchor, isTrue);
+      expect(slot2Top.rank, Rank.six);
+    });
+
+    test('tierFixedRank spawns high-tier anchor after high-tier streak unlock',
+        () {
+      var state = TriPeaksState.newGame(
+        deck: _buildHighTierUnlockDeck(),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.tierFixedRank,
+          lowTierAnchorRank: Rank.six,
+          highTierAnchorRank: Rank.queen,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+
+      final slot2Top = state.bonusSlotsState.slots[1].single;
+      expect(slot2Top.isAnchor, isTrue);
+      expect(slot2Top.rank, Rank.queen);
+    });
+
+    test(
+      'placing any tableau card onto joker slot is accepted and consumes joker',
+      () {
+        var state = TriPeaksState.newGame(
+          deck: _buildJokerConsumeDeck(),
+          bonusSlotsConfig: const BonusSlotsConfig(
+            spawnPolicy: BonusSlotSpawnPolicy.joker,
+          ),
+        );
+        state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+        state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+        state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+        expect(state.bonusSlotsState.slots[1].single.isJoker, isTrue);
+
+        final result = tryReduceTriPeaks(
+          state,
+          const RemoveTableauCardAction(21, targetSlot: 2),
+        );
+        expect(result.isSuccess, isTrue);
+        expect(result.state.bonusSlotsState.slots[1].length, 1);
+        expect(result.state.bonusSlotsState.slots[1].last.isJoker, isFalse);
+      },
+    );
+
+    test('closing slots removes unused jokers and merges real cards', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildJokerConsumeDeck(),
+        streakConfig: const StreakConfig(resetOnDraw: true),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.joker,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+      expect(state.bonusSlotsState.slots[1].single.isJoker, isTrue);
+
+      state = reduceTriPeaks(state, const DrawFromStockAction());
+      expect(state.bonusSlotsState.openSlotsCount, 1);
+      expect(state.bonusSlotsState.slots[1], isEmpty);
+      expect(state.bonusSlotsState.slots[2], isEmpty);
+      expect(
+        state.bonusSlotsState.slots[0].any((card) => card.isJoker),
+        isFalse,
+      );
+    });
+
+    test('closing slots keeps slot1 top card stable', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildJokerConsumeDeck(),
+        streakConfig: const StreakConfig(resetOnInvalidAction: true),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.joker,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+      state = reduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(21, targetSlot: 2),
+      );
+      final slot1TopBefore = state.bonusSlotsState.slots[0].last;
+      final slot2TopBefore = state.bonusSlotsState.slots[1].last;
+      expect(slot2TopBefore.isJoker, isFalse);
+
+      final invalid = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(0),
+      );
+      expect(invalid.isSuccess, isFalse);
+      expect(invalid.state.bonusSlotsState.openSlotsCount, 1);
+      expect(invalid.state.bonusSlotsState.slots[0].last, slot1TopBefore);
+    });
+
+    test('draw/invalid can close bonus slots based on config', () {
+      var drawState = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        streakConfig: const StreakConfig(resetOnDraw: true),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          closeOnDraw: true,
+          closeOnInvalidAction: true,
+        ),
+      );
+      drawState = reduceTriPeaks(drawState, const RemoveTableauCardAction(18));
+      drawState = reduceTriPeaks(drawState, const RemoveTableauCardAction(19));
+      drawState = reduceTriPeaks(drawState, const RemoveTableauCardAction(20));
+      expect(drawState.bonusSlotsState.openSlotsCount, 2);
+      drawState = reduceTriPeaks(drawState, const DrawFromStockAction());
+      expect(drawState.streakState.currentStreak, 0);
+      expect(drawState.bonusSlotsState.openSlotsCount, 1);
+
+      var invalidState = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        streakConfig: const StreakConfig(resetOnInvalidAction: true),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          closeOnDraw: true,
+          closeOnInvalidAction: true,
+        ),
+      );
+      invalidState =
+          reduceTriPeaks(invalidState, const RemoveTableauCardAction(18));
+      invalidState =
+          reduceTriPeaks(invalidState, const RemoveTableauCardAction(19));
+      invalidState =
+          reduceTriPeaks(invalidState, const RemoveTableauCardAction(20));
+      expect(invalidState.bonusSlotsState.openSlotsCount, 2);
+      final invalid = tryReduceTriPeaks(
+        invalidState,
+        const RemoveTableauCardAction(99),
+      );
+      expect(invalid.isSuccess, isFalse);
+      expect(invalid.state.streakState.currentStreak, 0);
+      expect(invalid.state.bonusSlotsState.openSlotsCount, 1);
+    });
+
+    test('undo restores bonus slots state', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        undoConfig: const UndoConfig(maxSteps: 10),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+      expect(state.bonusSlotsState.openSlotsCount, 2);
+
+      state = reduceTriPeaks(state, const UndoAction());
+      expect(state.streakState.currentStreak, 2);
+      expect(state.bonusSlotsState.openSlotsCount, 1);
+      expect(state.bonusSlotsState.slots[0].length, 3);
+      expect(state.bonusSlotsState.slots[1], isEmpty);
+    });
+
+    test('closed bonus slot use returns typed failure', () {
+      final state = TriPeaksState.newGame(seed: 10);
+      final result = tryReduceTriPeaks(state, const UseBonusSlotAction(2));
+
+      expect(result.isSuccess, isFalse);
+      expect(result.error?.code, TriPeaksErrorCode.bonusSlotClosed);
+    });
+
+    test(
+      'determinism: same seed+actions => same bonus slot open/close sequence',
+      () {
+        final actions = <TriPeaksAction>[
+          const RemoveTableauCardAction(18),
+          const RemoveTableauCardAction(19),
+          const RemoveTableauCardAction(20),
+          const DrawFromStockAction(),
+          const RemoveTableauCardAction(21), // likely invalid after draw
+        ];
+        var a = TriPeaksState.newGame(
+          deck: _buildStreakUnlockDeck(),
+          streakConfig: const StreakConfig(
+            resetOnDraw: true,
+            resetOnInvalidAction: true,
+          ),
+        );
+        var b = TriPeaksState.newGame(
+          deck: _buildStreakUnlockDeck(),
+          streakConfig: const StreakConfig(
+            resetOnDraw: true,
+            resetOnInvalidAction: true,
+          ),
+        );
+        final seqA = <int>[a.bonusSlotsState.openSlotsCount];
+        final seqB = <int>[b.bonusSlotsState.openSlotsCount];
+        for (final action in actions) {
+          a = tryReduceTriPeaks(a, action).state;
+          b = tryReduceTriPeaks(b, action).state;
+          seqA.add(a.bonusSlotsState.openSlotsCount);
+          seqB.add(b.bonusSlotsState.openSlotsCount);
+        }
+
+        expect(seqA, equals(seqB));
+      },
+    );
+
+    test('draw always targets slot1 and remove can target explicit slot piles',
+        () {
+      var state = TriPeaksState.newGame(
+        deck: _buildBonusSlotTargetDeck(),
+        streakConfig: const StreakConfig(resetOnDraw: false),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.joker,
+          closeOnDraw: false,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+      expect(state.bonusSlotsState.openSlotsCount, 2);
+
+      final slot1Before = state.bonusSlotsState.slots[0].last;
+      final drawToClosed = tryReduceTriPeaks(
+        state,
+        const DrawFromStockAction(targetSlot: 2),
+      );
+      expect(drawToClosed.isSuccess, isFalse);
+      expect(drawToClosed.error?.code, TriPeaksErrorCode.invalidBonusSlotIndex);
+
+      state = reduceTriPeaks(state, const DrawFromStockAction());
+      expect(state.bonusSlotsState.slots[0].last, isNot(slot1Before));
+
+      final rightSlot = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(21, targetSlot: 2),
+      );
+      expect(rightSlot.isSuccess, isTrue);
+      expect(rightSlot.state.removed[21], isTrue);
+      expect(rightSlot.state.bonusSlotsState.slots[1].length, 1);
+    });
+
+    test('undo restores bonus slot piles', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildBonusSlotTargetDeck(),
+        undoConfig: const UndoConfig(maxSteps: 10),
+        streakConfig: const StreakConfig(resetOnDraw: false),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.joker,
+          closeOnDraw: false,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+      state = reduceTriPeaks(state, const DrawFromStockAction());
+      final beforeTake = state.bonusSlotsState.slots[1].length;
+
+      state = reduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(21, targetSlot: 2),
+      );
+      expect(state.bonusSlotsState.slots[1].length, beforeTake);
+
+      state = reduceTriPeaks(state, const UndoAction());
+      expect(state.removed[21], isFalse);
+      expect(state.bonusSlotsState.slots[1].length, beforeTake);
     });
   });
 
@@ -1105,6 +1561,59 @@ void main() {
           decoded.entries.first.action.kind, replay.entries.first.action.kind);
     });
 
+    test(
+      'tierFixedRank anchor behavior is preserved in replay reconstruction',
+      () {
+        var liveState = TriPeaksSessionState.newSession(
+          ruleset: TriPeaksRuleset.threeRounds,
+          seed: 0,
+          streakConfig: const StreakConfig(resetOnDraw: false),
+          bonusSlotsConfig: const BonusSlotsConfig(
+            spawnPolicy: BonusSlotSpawnPolicy.tierFixedRank,
+            lowTierAnchorRank: Rank.six,
+            highTierAnchorRank: Rank.queen,
+          ),
+        );
+        var replay = TriPeaksReplay.newSession(
+          seed: 0,
+          ruleset: TriPeaksRuleset.threeRounds,
+          streakConfig: const StreakConfig(resetOnDraw: false),
+          bonusSlotsConfig: const BonusSlotsConfig(
+            spawnPolicy: BonusSlotSpawnPolicy.tierFixedRank,
+            lowTierAnchorRank: Rank.six,
+            highTierAnchorRank: Rank.queen,
+          ),
+        );
+
+        var guard = 0;
+        while (liveState.currentRound.streakState.currentStreak < 3 &&
+            guard < 64) {
+          final moves =
+              liveState.currentRound.availableMoves.removableTableauIndices;
+          final action = moves.isNotEmpty
+              ? PlayRoundAction(RemoveTableauCardAction(moves.first))
+              : const PlayRoundAction(DrawFromStockAction());
+          final recorded = recordAction(replay, liveState, action);
+          replay = recorded.replay;
+          liveState = recorded.state;
+          guard++;
+        }
+        expect(liveState.currentRound.streakState.currentStreak,
+            greaterThanOrEqualTo(3));
+
+        final rebuilt = replayToState(replay);
+        expect(
+          rebuilt.currentRound.bonusSlotsState.slots[1].single.isAnchor,
+          isTrue,
+        );
+        expect(
+          rebuilt.currentRound.bonusSlotsState.slots[1].single.rank,
+          liveState.currentRound.bonusSlotsState.slots[1].single.rank,
+        );
+        expect(sessionFingerprint(rebuilt), sessionFingerprint(liveState));
+      },
+    );
+
     test('unsupported replay schema returns typed failure', () {
       final decode = ReplaySession.tryFromMap(
         <String, dynamic>{
@@ -1171,11 +1680,43 @@ void main() {
       expect(restored.undoStepsAvailable, progressed.undoStepsAvailable);
     });
 
+    test('tierFixedRank config and anchor card round-trip via map', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.tierFixedRank,
+          defaultAnchorTierWhenUnknown: BonusSlotAnchorTier.high,
+          lowTierAnchorRank: Rank.eight,
+          highTierAnchorRank: Rank.king,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+      final before = stateFingerprint(state);
+
+      final decoded = TriPeaksState.tryFromMap(state.toMap());
+      expect(decoded.isSuccess, isTrue);
+      final restored = decoded.value!;
+
+      expect(restored.bonusSlotsConfig.spawnPolicy,
+          BonusSlotSpawnPolicy.tierFixedRank);
+      expect(
+        restored.bonusSlotsConfig.defaultAnchorTierWhenUnknown,
+        BonusSlotAnchorTier.high,
+      );
+      expect(restored.bonusSlotsConfig.lowTierAnchorRank, Rank.eight);
+      expect(restored.bonusSlotsConfig.highTierAnchorRank, Rank.king);
+      expect(restored.bonusSlotsState.slots[1].single.isAnchor, isTrue);
+      expect(stateFingerprint(restored), before);
+    });
+
     test('session action map round-trip preserves action identity', () {
       final actions = <TriPeaksSessionAction>[
         const PlayRoundAction(DrawFromStockAction()),
         const PlayRoundAction(RemoveTableauCardAction(12)),
         const PlayRoundAction(UndoAction()),
+        const PlayRoundAction(StrikeTimerExpiredAction(deadlineToken: 7)),
         const StartNextRoundAction(),
         const AbortRoundAction(reason: AbortReason.disconnect),
       ];
@@ -1203,6 +1744,16 @@ void main() {
               PlayRoundAction(action: UndoAction()),
               PlayRoundAction(action: UndoAction())
             ):
+            break;
+          case (
+              PlayRoundAction(
+                action: StrikeTimerExpiredAction(deadlineToken: final a),
+              ),
+              PlayRoundAction(
+                action: StrikeTimerExpiredAction(deadlineToken: final b),
+              )
+            ):
+            expect(a, b);
             break;
           case (StartNextRoundAction(), StartNextRoundAction()):
             break;
@@ -1252,7 +1803,7 @@ void main() {
 
     test('fingerprint is stable for fixed canonical state', () {
       final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), 'f7699fa9');
+      expect(stateFingerprint(state), '4416c38c');
     });
   });
 
@@ -1689,6 +2240,107 @@ void main() {
     );
   });
 
+  group('Match finalization', () {
+    MatchState buildFinalizableMatch() {
+      final config = MatchConfig(
+        matchMode: MatchMode.realtime,
+        matchId: 'fin',
+        matchSeed: 1001,
+        maxPlayers: 2,
+      );
+      var state = MatchState.newMatch(config: config);
+      state = tryReduceMatch(state, const JoinMatchEvent(playerId: 'p1')).state;
+      state = tryReduceMatch(state, const JoinMatchEvent(playerId: 'p2')).state;
+      state = tryReduceMatch(state, const StartMatchEvent()).state;
+      for (var i = 0; i < 3; i++) {
+        state = tryReduceMatch(
+          state,
+          const SubmitMatchActionEvent(
+            playerId: 'p1',
+            action: AbortRoundAction(reason: AbortReason.userSkip),
+          ),
+        ).state;
+      }
+      for (var i = 0; i < 3; i++) {
+        state = tryReduceMatch(
+          state,
+          const SubmitMatchActionEvent(
+            playerId: 'p2',
+            action: AbortRoundAction(reason: AbortReason.userSkip),
+          ),
+        ).state;
+      }
+      return state;
+    }
+
+    test('finalizeMatch produces stable result for same match state', () {
+      final state = buildFinalizableMatch();
+      const config = MatchFinalizationConfig(
+        finishCondition: MatchFinishCondition.allPlayersFinished,
+      );
+
+      final a = finalizeMatch(state, config);
+      final b = finalizeMatch(state, config);
+
+      expect(a.isSuccess, isTrue);
+      expect(b.isSuccess, isTrue);
+      expect(a.result!.toMap(), equals(b.result!.toMap()));
+    });
+
+    test('finalized match rejects further submit actions', () {
+      final state = buildFinalizableMatch();
+      final finalized = finalizeMatch(
+        state,
+        const MatchFinalizationConfig(
+          finishCondition: MatchFinishCondition.allPlayersFinished,
+        ),
+      );
+      expect(finalized.isSuccess, isTrue);
+      final finishedState = finalized.finishedMatchState!;
+
+      final after = tryReduceMatch(
+        finishedState,
+        const SubmitMatchActionEvent(
+          playerId: 'p1',
+          action: PlayRoundAction(DrawFromStockAction()),
+        ),
+      );
+      expect(after.isSuccess, isFalse);
+      expect(after.failure?.code, MatchReduceFailureCode.matchAlreadyFinished);
+    });
+
+    test('finalizeMatch is idempotent on already finalized match state', () {
+      final state = buildFinalizableMatch();
+      const config = MatchFinalizationConfig(
+        finishCondition: MatchFinishCondition.allPlayersFinished,
+      );
+
+      final first = finalizeMatch(state, config);
+      expect(first.isSuccess, isTrue);
+      final second = finalizeMatch(first.finishedMatchState!, config);
+      expect(second.isSuccess, isTrue);
+      expect(second.alreadyFinalized, isTrue);
+      expect(second.result!.toMap(), equals(first.result!.toMap()));
+    });
+
+    test('FinalMatchResult serialization round-trip preserves equality', () {
+      final state = buildFinalizableMatch();
+      final finalized = finalizeMatch(
+        state,
+        const MatchFinalizationConfig(
+          finishCondition: MatchFinishCondition.allPlayersFinished,
+        ),
+      );
+      final result = finalized.result!;
+
+      final decoded = FinalMatchResult.tryFromMap(result.toMap());
+      expect(decoded.isSuccess, isTrue);
+      expect(decoded.value!.toMap(), equals(result.toMap()));
+      expect(decoded.value!.schemaVersion, result.schemaVersion);
+      expect(decoded.value!.engineVersion, result.engineVersion);
+    });
+  });
+
   group('Server authority', () {
     ServerAuthorityState buildAuthority() {
       final config = MatchConfig(
@@ -1905,6 +2557,121 @@ void main() {
         expect(replayed.toMap(), equals(authority.matchState.toMap()));
       },
     );
+
+    test('reconnect returns consistent state and does not mutate authority',
+        () {
+      var authority = buildAuthority();
+      authority = applyClientEvent(
+        authority,
+        const ClientEvent(
+          matchId: 'srv',
+          playerId: 'p1',
+          clientEventId: 'p1-1',
+          clientSeq: 1,
+          event: JoinMatchEvent(playerId: 'p1'),
+        ),
+      ).state;
+      authority = applyClientEvent(
+        authority,
+        const ClientEvent(
+          matchId: 'srv',
+          playerId: 'p1',
+          clientEventId: 'p1-2',
+          clientSeq: 2,
+          event: StartMatchEvent(),
+        ),
+      ).state;
+
+      final beforeMap = authority.matchState.toMap();
+      final beforeSeq = authority.matchState.authoritativeSequence;
+      final resultA = handleReconnect(
+        authority,
+        const ReconnectRequest(
+          matchId: 'srv',
+          playerId: 'p1',
+          lastKnownAuthoritativeSequence: 0,
+        ),
+      );
+      final resultB = handleReconnect(
+        authority,
+        const ReconnectRequest(
+          matchId: 'srv',
+          playerId: 'p1',
+          lastKnownAuthoritativeSequence: 0,
+        ),
+      );
+
+      expect(resultA.isSuccess, isTrue);
+      expect(resultA.snapshot?.toMap(), equals(resultB.snapshot?.toMap()));
+      expect(resultA.authoritativeSequence, beforeSeq);
+      expect(authority.matchState.toMap(), equals(beforeMap));
+      expect(authority.matchState.authoritativeSequence, beforeSeq);
+    });
+
+    test('reconnect detects fingerprint mismatch and flags full resync', () {
+      var authority = buildAuthority();
+      authority = applyClientEvent(
+        authority,
+        const ClientEvent(
+          matchId: 'srv',
+          playerId: 'p1',
+          clientEventId: 'p1-1',
+          clientSeq: 1,
+          event: JoinMatchEvent(playerId: 'p1'),
+        ),
+      ).state;
+      authority = applyClientEvent(
+        authority,
+        const ClientEvent(
+          matchId: 'srv',
+          playerId: 'p1',
+          clientEventId: 'p1-2',
+          clientSeq: 2,
+          event: StartMatchEvent(),
+        ),
+      ).state;
+
+      final reconnect = handleReconnect(
+        authority,
+        const ReconnectRequest(
+          matchId: 'srv',
+          playerId: 'p1',
+          lastKnownAuthoritativeSequence: 2,
+          lastKnownFingerprint: 'wrong-fingerprint',
+        ),
+      );
+
+      expect(reconnect.isSuccess, isTrue);
+      expect(reconnect.mustFullyResync, isTrue);
+    });
+
+    test('reconnect does not change authoritativeSequence', () {
+      var authority = buildAuthority();
+      authority = applyClientEvent(
+        authority,
+        const ClientEvent(
+          matchId: 'srv',
+          playerId: 'p1',
+          clientEventId: 'p1-1',
+          clientSeq: 1,
+          event: JoinMatchEvent(playerId: 'p1'),
+        ),
+      ).state;
+      final beforeSeq = authority.matchState.authoritativeSequence;
+
+      final reconnect = handleReconnect(
+        authority,
+        const ReconnectRequest(
+          matchId: 'srv',
+          playerId: 'p1',
+          lastKnownAuthoritativeSequence: 1,
+        ),
+      );
+
+      expect(reconnect.isSuccess, isTrue);
+      expect(reconnect.authoritativeSequence, beforeSeq);
+      expect(authority.matchState.authoritativeSequence, beforeSeq);
+    });
   });
 
   test('engine source does not call DateTime.now', () {
@@ -1923,6 +2690,97 @@ List<Card> _buildDeck({
     _placeCard(deck, entry.key, entry.value);
   }
   return deck;
+}
+
+List<Card> _buildPeakBonusDeck() {
+  return _buildDeck(
+    waste: const Card(Rank.seven, Suit.spades),
+    tableauOverrides: <int, Card>{
+      0: const Card(Rank.five, Suit.hearts),
+      1: const Card(Rank.ten, Suit.spades),
+      2: const Card(Rank.seven, Suit.diamonds),
+      3: const Card(Rank.three, Suit.diamonds),
+      4: const Card(Rank.four, Suit.spades),
+      5: const Card(Rank.jack, Suit.diamonds),
+      6: const Card(Rank.ten, Suit.hearts),
+      7: const Card(Rank.eight, Suit.clubs),
+      8: const Card(Rank.nine, Suit.diamonds),
+      9: const Card(Rank.two, Suit.clubs),
+      10: const Card(Rank.ace, Suit.diamonds),
+      11: const Card(Rank.two, Suit.hearts),
+      12: const Card(Rank.nine, Suit.clubs),
+      13: const Card(Rank.ten, Suit.diamonds),
+      14: const Card(Rank.jack, Suit.clubs),
+      15: const Card(Rank.ten, Suit.clubs),
+      16: const Card(Rank.jack, Suit.spades),
+      17: const Card(Rank.queen, Suit.hearts),
+      18: const Card(Rank.six, Suit.clubs),
+      19: const Card(Rank.five, Suit.diamonds),
+      20: const Card(Rank.four, Suit.hearts),
+      21: const Card(Rank.three, Suit.spades),
+      22: const Card(Rank.six, Suit.diamonds),
+      23: const Card(Rank.seven, Suit.clubs),
+      24: const Card(Rank.eight, Suit.diamonds),
+      25: const Card(Rank.jack, Suit.hearts),
+      26: const Card(Rank.queen, Suit.clubs),
+      27: const Card(Rank.king, Suit.diamonds),
+    },
+  );
+}
+
+List<Card> _buildStreakUnlockDeck() {
+  return _buildDeck(
+    waste: const Card(Rank.seven, Suit.spades),
+    tableauOverrides: <int, Card>{
+      18: const Card(Rank.six, Suit.clubs),
+      19: const Card(Rank.five, Suit.clubs),
+      20: const Card(Rank.four, Suit.clubs),
+      21: const Card(Rank.three, Suit.clubs),
+      22: const Card(Rank.two, Suit.clubs),
+      23: const Card(Rank.ace, Suit.clubs),
+      24: const Card(Rank.king, Suit.clubs),
+      25: const Card(Rank.queen, Suit.clubs),
+      26: const Card(Rank.jack, Suit.clubs),
+      27: const Card(Rank.ten, Suit.clubs),
+    },
+  );
+}
+
+List<Card> _buildBonusSlotTargetDeck() {
+  final deck = _buildDeck(
+    waste: const Card(Rank.seven, Suit.spades),
+    tableauOverrides: <int, Card>{
+      18: const Card(Rank.six, Suit.clubs),
+      19: const Card(Rank.five, Suit.clubs),
+      20: const Card(Rank.four, Suit.clubs),
+      21: const Card(Rank.two, Suit.diamonds),
+    },
+  );
+  _placeCard(deck, 29, const Card(Rank.three, Suit.hearts));
+  return deck;
+}
+
+List<Card> _buildJokerConsumeDeck() {
+  return _buildDeck(
+    waste: const Card(Rank.seven, Suit.spades),
+    tableauOverrides: <int, Card>{
+      18: const Card(Rank.six, Suit.clubs),
+      19: const Card(Rank.five, Suit.clubs),
+      20: const Card(Rank.four, Suit.clubs),
+      21: const Card(Rank.king, Suit.hearts),
+    },
+  );
+}
+
+List<Card> _buildHighTierUnlockDeck() {
+  return _buildDeck(
+    waste: const Card(Rank.queen, Suit.spades),
+    tableauOverrides: <int, Card>{
+      18: const Card(Rank.king, Suit.clubs),
+      19: const Card(Rank.ace, Suit.clubs),
+      20: const Card(Rank.king, Suit.hearts),
+    },
+  );
 }
 
 void _placeCard(List<Card> deck, int position, Card card) {

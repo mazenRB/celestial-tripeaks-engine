@@ -15,6 +15,8 @@ final class ReplaySession {
     required this.roundRulesConfig,
     required this.undoConfig,
     required this.streakConfig,
+    required this.strikeTimerConfig,
+    required this.bonusSlotsConfig,
     required this.entries,
   });
 
@@ -26,6 +28,8 @@ final class ReplaySession {
     RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
     UndoConfig undoConfig = const UndoConfig(),
     StreakConfig streakConfig = const StreakConfig(),
+    StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
+    BonusSlotsConfig bonusSlotsConfig = const BonusSlotsConfig(),
     int schemaVersion = supportedSchemaVersion,
     int engineVersion = 1,
   }) {
@@ -38,6 +42,8 @@ final class ReplaySession {
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
+      strikeTimerConfig: strikeTimerConfig,
+      bonusSlotsConfig: bonusSlotsConfig,
       entries: const <ReplayEntry>[],
     );
   }
@@ -66,6 +72,12 @@ final class ReplaySession {
   /// Streak config.
   final StreakConfig streakConfig;
 
+  /// Strike timer config.
+  final StrikeTimerConfig strikeTimerConfig;
+
+  /// Bonus-slots config.
+  final BonusSlotsConfig bonusSlotsConfig;
+
   /// Ordered append-only attempts log.
   final List<ReplayEntry> entries;
 
@@ -81,6 +93,8 @@ final class ReplaySession {
       'roundRulesConfig': roundRulesConfig.toMap(),
       'undoConfig': undoConfig.toMap(),
       'streakConfig': streakConfig.toMap(),
+      'strikeTimerConfig': strikeTimerConfig.toMap(),
+      'bonusSlotsConfig': bonusSlotsConfig.toMap(),
       'entries': entries.map((entry) => entry.toMap()).toList(growable: false),
     };
   }
@@ -178,6 +192,35 @@ final class ReplaySession {
     if (!streakConfigResult.isSuccess) {
       return DecodeResult.failure(streakConfigResult.error!);
     }
+    final strikeTimerConfigMap = map['strikeTimerConfig'];
+    if (strikeTimerConfigMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'strikeTimerConfig must be a map.',
+        ),
+      );
+    }
+    final strikeTimerConfigResult = StrikeTimerConfig.tryFromMap(
+      strikeTimerConfigMap,
+    );
+    if (!strikeTimerConfigResult.isSuccess) {
+      return DecodeResult.failure(strikeTimerConfigResult.error!);
+    }
+    final bonusSlotsConfigMap = map['bonusSlotsConfig'];
+    if (bonusSlotsConfigMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'bonusSlotsConfig must be a map.',
+        ),
+      );
+    }
+    final bonusSlotsConfigResult =
+        BonusSlotsConfig.tryFromMap(bonusSlotsConfigMap);
+    if (!bonusSlotsConfigResult.isSuccess) {
+      return DecodeResult.failure(bonusSlotsConfigResult.error!);
+    }
 
     final entriesRaw = map['entries'];
     if (entriesRaw is! List<dynamic>) {
@@ -226,6 +269,8 @@ final class ReplaySession {
         roundRulesConfig: roundRulesResult.value!,
         undoConfig: undoConfigResult.value!,
         streakConfig: streakConfigResult.value!,
+        strikeTimerConfig: strikeTimerConfigResult.value!,
+        bonusSlotsConfig: bonusSlotsConfigResult.value!,
         entries: List<ReplayEntry>.unmodifiable(entries),
       ),
     );
@@ -243,6 +288,8 @@ final class ReplaySession {
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
+      strikeTimerConfig: strikeTimerConfig,
+      bonusSlotsConfig: bonusSlotsConfig,
       entries: List<ReplayEntry>.unmodifiable(entries ?? this.entries),
     );
   }
@@ -259,6 +306,9 @@ enum ReplayFailureReason {
   alreadyOnLastRound,
   undoDisabled,
   nothingToUndo,
+  strikeTimerDisabled,
+  strikeTimerNotArmed,
+  staleStrikeTimerExpiry,
 }
 
 /// Session action descriptor for replay serialization.
@@ -267,6 +317,9 @@ final class ReplayActionDto {
   const ReplayActionDto({
     required this.kind,
     this.tableauIndex,
+    this.targetSlot,
+    this.slotIndex,
+    this.deadlineToken,
     this.abortReason,
   });
 
@@ -275,15 +328,32 @@ final class ReplayActionDto {
     switch (action) {
       case PlayRoundAction(action: final roundAction):
         switch (roundAction) {
-          case DrawFromStockAction():
-            return const ReplayActionDto(kind: ReplayActionKind.drawFromStock);
-          case RemoveTableauCardAction(index: final index):
+          case DrawFromStockAction(targetSlot: final targetSlot):
+            return ReplayActionDto(
+              kind: ReplayActionKind.drawFromStock,
+              targetSlot: targetSlot,
+            );
+          case RemoveTableauCardAction(
+              index: final index,
+              targetSlot: final targetSlot,
+            ):
             return ReplayActionDto(
               kind: ReplayActionKind.removeTableauCard,
               tableauIndex: index,
+              targetSlot: targetSlot,
             );
           case UndoAction():
             return const ReplayActionDto(kind: ReplayActionKind.undo);
+          case UseBonusSlotAction(slotIndex: final slotIndex):
+            return ReplayActionDto(
+              kind: ReplayActionKind.useBonusSlot,
+              slotIndex: slotIndex,
+            );
+          case StrikeTimerExpiredAction(deadlineToken: final deadlineToken):
+            return ReplayActionDto(
+              kind: ReplayActionKind.strikeTimerExpired,
+              deadlineToken: deadlineToken,
+            );
         }
       case StartNextRoundAction():
         return const ReplayActionDto(kind: ReplayActionKind.startNextRound);
@@ -339,6 +409,9 @@ final class ReplayActionDto {
         ReplayActionDto(
           kind: ReplayActionKind.values.byName(kindName),
           tableauIndex: map['tableauIndex'] as int?,
+          targetSlot: map['targetSlot'] as int?,
+          slotIndex: map['slotIndex'] as int?,
+          deadlineToken: map['deadlineToken'] as int?,
           abortReason:
               reasonName == null ? null : AbortReason.values.byName(reasonName),
         ),
@@ -359,6 +432,15 @@ final class ReplayActionDto {
   /// Tableau index for remove action.
   final int? tableauIndex;
 
+  /// Slot index for bonus-slot action.
+  final int? slotIndex;
+
+  /// Optional target slot for draw/remove actions.
+  final int? targetSlot;
+
+  /// Token for strike-expiry action.
+  final int? deadlineToken;
+
   /// Optional abort reason.
   final AbortReason? abortReason;
 
@@ -369,6 +451,9 @@ final class ReplayActionDto {
       'type': 'replay_action',
       'kind': kind.name,
       if (tableauIndex case final index?) 'tableauIndex': index,
+      if (targetSlot case final target?) 'targetSlot': target,
+      if (slotIndex case final slot?) 'slotIndex': slot,
+      if (deadlineToken case final token?) 'deadlineToken': token,
       if (abortReason case final reason?) 'abortReason': reason.name,
     };
   }
@@ -377,15 +462,31 @@ final class ReplayActionDto {
   TriPeaksSessionAction toSessionAction() {
     switch (kind) {
       case ReplayActionKind.drawFromStock:
-        return const PlayRoundAction(DrawFromStockAction());
+        return PlayRoundAction(
+          DrawFromStockAction(targetSlot: targetSlot),
+        );
       case ReplayActionKind.removeTableauCard:
         final index = tableauIndex;
         if (index == null) {
           throw StateError('tableauIndex is required for removeTableauCard.');
         }
-        return PlayRoundAction(RemoveTableauCardAction(index));
+        return PlayRoundAction(
+          RemoveTableauCardAction(index, targetSlot: targetSlot),
+        );
       case ReplayActionKind.undo:
         return const PlayRoundAction(UndoAction());
+      case ReplayActionKind.useBonusSlot:
+        final index = slotIndex;
+        if (index == null) {
+          throw StateError('slotIndex is required for useBonusSlot.');
+        }
+        return PlayRoundAction(UseBonusSlotAction(index));
+      case ReplayActionKind.strikeTimerExpired:
+        final token = deadlineToken;
+        if (token == null) {
+          throw StateError('deadlineToken is required for strikeTimerExpired.');
+        }
+        return PlayRoundAction(StrikeTimerExpiredAction(deadlineToken: token));
       case ReplayActionKind.startNextRound:
         return const StartNextRoundAction();
       case ReplayActionKind.abortRound:
@@ -399,6 +500,8 @@ enum ReplayActionKind {
   drawFromStock,
   removeTableauCard,
   undo,
+  useBonusSlot,
+  strikeTimerExpired,
   startNextRound,
   abortRound,
 }
@@ -603,6 +706,8 @@ TriPeaksSessionState replayStep(ReplaySession replay, int count) {
     roundRulesConfig: replay.roundRulesConfig,
     undoConfig: replay.undoConfig,
     streakConfig: replay.streakConfig,
+    strikeTimerConfig: replay.strikeTimerConfig,
+    bonusSlotsConfig: replay.bonusSlotsConfig,
   );
 
   final ordered = replay.entries.take(count).toList(growable: false)
@@ -635,6 +740,11 @@ bool _isAcceptedResult(TriPeaksSessionReduceResult result) {
         return true;
       case TriPeaksErrorCode.undoDisabled:
       case TriPeaksErrorCode.nothingToUndo:
+      case TriPeaksErrorCode.invalidBonusSlotIndex:
+      case TriPeaksErrorCode.bonusSlotClosed:
+      case TriPeaksErrorCode.strikeTimerDisabled:
+      case TriPeaksErrorCode.strikeTimerNotArmed:
+      case TriPeaksErrorCode.staleStrikeTimerExpiry:
         return false;
     }
   }
@@ -660,9 +770,17 @@ ReplayFailureReason _mapFailureReason(TriPeaksSessionReduceResult result) {
         return ReplayFailureReason.undoDisabled;
       case TriPeaksErrorCode.nothingToUndo:
         return ReplayFailureReason.nothingToUndo;
+      case TriPeaksErrorCode.strikeTimerDisabled:
+        return ReplayFailureReason.strikeTimerDisabled;
+      case TriPeaksErrorCode.strikeTimerNotArmed:
+        return ReplayFailureReason.strikeTimerNotArmed;
+      case TriPeaksErrorCode.staleStrikeTimerExpiry:
+        return ReplayFailureReason.staleStrikeTimerExpiry;
       case TriPeaksErrorCode.invalidTableauIndex:
       case TriPeaksErrorCode.tableauCardNotRemovable:
       case TriPeaksErrorCode.emptyStock:
+      case TriPeaksErrorCode.invalidBonusSlotIndex:
+      case TriPeaksErrorCode.bonusSlotClosed:
         break;
     }
   }

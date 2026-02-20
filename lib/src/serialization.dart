@@ -243,24 +243,40 @@ DecodeResult<ActionEnvelopeV1> _decodeActionEnvelopeV1(
 /// Serializes one round action with schema/type envelope.
 Map<String, dynamic> roundActionToMap(TriPeaksAction action) {
   switch (action) {
-    case DrawFromStockAction():
+    case DrawFromStockAction(targetSlot: final targetSlot):
       return <String, dynamic>{
         'schemaVersion': _serializationSchemaV1,
         'type': 'tripeaks_round_action',
         'actionType': 'draw_from_stock',
+        if (targetSlot case final slot?) 'targetSlot': slot,
       };
-    case RemoveTableauCardAction(index: final index):
+    case RemoveTableauCardAction(index: final index, targetSlot: final slot):
       return <String, dynamic>{
         'schemaVersion': _serializationSchemaV1,
         'type': 'tripeaks_round_action',
         'actionType': 'remove_tableau_card',
         'index': index,
+        if (slot case final target?) 'targetSlot': target,
       };
     case UndoAction():
       return <String, dynamic>{
         'schemaVersion': _serializationSchemaV1,
         'type': 'tripeaks_round_action',
         'actionType': 'undo',
+      };
+    case UseBonusSlotAction(slotIndex: final slotIndex):
+      return <String, dynamic>{
+        'schemaVersion': _serializationSchemaV1,
+        'type': 'tripeaks_round_action',
+        'actionType': 'use_bonus_slot',
+        'slotIndex': slotIndex,
+      };
+    case StrikeTimerExpiredAction(deadlineToken: final deadlineToken):
+      return <String, dynamic>{
+        'schemaVersion': _serializationSchemaV1,
+        'type': 'tripeaks_round_action',
+        'actionType': 'strike_timer_expired',
+        'deadlineToken': deadlineToken,
       };
   }
 }
@@ -279,7 +295,18 @@ DecodeResult<TriPeaksAction> tryDecodeRoundAction(Map<String, dynamic> json) {
 
   switch (actionType) {
     case 'draw_from_stock':
-      return const DecodeResult.success(DrawFromStockAction());
+      final targetSlot = json['targetSlot'];
+      if (targetSlot != null && targetSlot is! int) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'draw_from_stock targetSlot must be int when present.',
+          ),
+        );
+      }
+      return DecodeResult.success(
+        DrawFromStockAction(targetSlot: targetSlot as int?),
+      );
     case 'remove_tableau_card':
       final index = json['index'];
       if (index is! int) {
@@ -290,9 +317,44 @@ DecodeResult<TriPeaksAction> tryDecodeRoundAction(Map<String, dynamic> json) {
           ),
         );
       }
-      return DecodeResult.success(RemoveTableauCardAction(index));
+      final targetSlot = json['targetSlot'];
+      if (targetSlot != null && targetSlot is! int) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'remove_tableau_card targetSlot must be int when present.',
+          ),
+        );
+      }
+      return DecodeResult.success(
+        RemoveTableauCardAction(index, targetSlot: targetSlot as int?),
+      );
     case 'undo':
       return const DecodeResult.success(UndoAction());
+    case 'use_bonus_slot':
+      final slotIndex = json['slotIndex'];
+      if (slotIndex is! int) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'use_bonus_slot requires int slotIndex.',
+          ),
+        );
+      }
+      return DecodeResult.success(UseBonusSlotAction(slotIndex));
+    case 'strike_timer_expired':
+      final deadlineToken = json['deadlineToken'];
+      if (deadlineToken is! int) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'strike_timer_expired requires int deadlineToken.',
+          ),
+        );
+      }
+      return DecodeResult.success(
+        StrikeTimerExpiredAction(deadlineToken: deadlineToken),
+      );
     default:
       return DecodeResult.failure(
         DecodeFailure(

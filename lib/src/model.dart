@@ -39,16 +39,63 @@ enum Rank {
   }
 }
 
+/// Card type discriminator used for deterministic serialization.
+enum CardKind {
+  normal,
+  anchor,
+  joker,
+}
+
 /// Immutable playing card.
 final class Card {
   /// Creates a standard card from a [rank] and [suit].
-  const Card(this.rank, this.suit);
+  const Card(this._rank, this._suit) : kind = CardKind.normal;
+
+  /// Creates a deterministic non-deck anchor card with [rank].
+  const Card.anchor(Rank rank)
+      : _rank = rank,
+        _suit = null,
+        kind = CardKind.anchor;
+
+  /// Creates a joker/wildcard anchor card.
+  const Card.joker()
+      : _rank = null,
+        _suit = null,
+        kind = CardKind.joker;
+
+  final Rank? _rank;
+  final Suit? _suit;
+
+  /// Card kind.
+  final CardKind kind;
+
+  /// Whether this card is a joker/wildcard.
+  bool get isJoker => kind == CardKind.joker;
+
+  /// Whether this card is a deterministic non-deck anchor.
+  bool get isAnchor => kind == CardKind.anchor;
 
   /// The card rank.
-  final Rank rank;
+  ///
+  /// Only available for non-joker cards.
+  Rank get rank {
+    final value = _rank;
+    if (value == null) {
+      throw StateError('Joker cards do not have a rank.');
+    }
+    return value;
+  }
 
   /// The card suit.
-  final Suit suit;
+  ///
+  /// Only available for normal deck cards.
+  Suit get suit {
+    final value = _suit;
+    if (value == null) {
+      throw StateError('Only normal deck cards have a suit.');
+    }
+    return value;
+  }
 
   /// A full 52-card deck in deterministic suit/rank order.
   static List<Card> standardDeck() {
@@ -62,26 +109,38 @@ final class Card {
   }
 
   @override
-  String toString() => '${rank.label} of $suit';
+  String toString() {
+    if (isJoker) {
+      return 'Joker';
+    }
+    if (isAnchor) {
+      return 'Anchor(${rank.label})';
+    }
+    return '${rank.label} of $suit';
+  }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
       return true;
     }
-    return other is Card && other.rank == rank && other.suit == suit;
+    return other is Card &&
+        other.kind == kind &&
+        other._rank == _rank &&
+        other._suit == _suit;
   }
 
   @override
-  int get hashCode => Object.hash(rank, suit);
+  int get hashCode => Object.hash(kind, _rank, _suit);
 
   /// Serializes card to JSON-friendly map.
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'schemaVersion': _serializationSchemaV1,
       'type': 'card',
-      'rank': rank.name,
-      'suit': suit.name,
+      'cardKind': kind.name,
+      if (!isJoker) 'rank': rank.name,
+      if (kind == CardKind.normal) 'suit': suit.name,
     };
   }
 
@@ -103,17 +162,72 @@ final class Card {
         ),
       );
     }
-    final rankName = map['rank'];
-    final suitName = map['suit'];
-    if (rankName is! String || suitName is! String) {
+    final kindName = map['cardKind'];
+    if (kindName == null) {
+      final rankName = map['rank'];
+      final suitName = map['suit'];
+      if (rankName is! String || suitName is! String) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'Card rank and suit must be strings.',
+          ),
+        );
+      }
+      try {
+        return DecodeResult.success(
+          Card(
+            Rank.values.byName(rankName),
+            Suit.values.byName(suitName),
+          ),
+        );
+      } on Object catch (error) {
+        return DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'Invalid card payload: $error',
+          ),
+        );
+      }
+    }
+
+    if (kindName is! String) {
       return const DecodeResult.failure(
         DecodeFailure(
           code: DecodeFailureCode.invalidPayload,
-          message: 'Card rank and suit must be strings.',
+          message: 'cardKind must be a string when present.',
         ),
       );
     }
     try {
+      final kind = CardKind.values.byName(kindName);
+      if (kind == CardKind.joker) {
+        return const DecodeResult.success(Card.joker());
+      }
+      if (kind == CardKind.anchor) {
+        final rankName = map['rank'];
+        if (rankName is! String) {
+          return const DecodeResult.failure(
+            DecodeFailure(
+              code: DecodeFailureCode.invalidPayload,
+              message: 'Anchor rank must be a string.',
+            ),
+          );
+        }
+        return DecodeResult.success(
+          Card.anchor(Rank.values.byName(rankName)),
+        );
+      }
+      final rankName = map['rank'];
+      final suitName = map['suit'];
+      if (rankName is! String || suitName is! String) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'Card rank and suit must be strings.',
+          ),
+        );
+      }
       return DecodeResult.success(
         Card(
           Rank.values.byName(rankName),

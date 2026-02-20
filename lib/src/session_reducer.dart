@@ -110,6 +110,8 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
         roundRulesConfig: state.roundRulesConfig,
         undoConfig: state.undoConfig,
         streakConfig: state.streakConfig,
+        strikeTimerConfig: state.strikeTimerConfig,
+        bonusSlotsConfig: state.bonusSlotsConfig,
       );
       return TriPeaksSessionReduceResult(
         state: state._copyWith(
@@ -157,6 +159,8 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
         roundRulesConfig: state.roundRulesConfig,
         undoConfig: state.undoConfig,
         streakConfig: state.streakConfig,
+        strikeTimerConfig: state.strikeTimerConfig,
+        bonusSlotsConfig: state.bonusSlotsConfig,
       );
 
       return TriPeaksSessionReduceResult(
@@ -173,23 +177,57 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
 
 TriPeaksRuleError? _validateAction(TriPeaksState state, TriPeaksAction action) {
   switch (action) {
-    case DrawFromStockAction():
+    case DrawFromStockAction(targetSlot: final targetSlot):
       if (!state.canDrawFromStock) {
         return const TriPeaksRuleError(
           code: TriPeaksErrorCode.emptyStock,
           message: 'Stock is empty.',
         );
       }
+      if (targetSlot case final slot?) {
+        if (slot != 1) {
+          return const TriPeaksRuleError(
+            code: TriPeaksErrorCode.invalidBonusSlotIndex,
+            message: 'Draw actions can only target slot 1.',
+          );
+        }
+        if (!state.isBonusSlotIndexInRange(slot)) {
+          return TriPeaksRuleError(
+            code: TriPeaksErrorCode.invalidBonusSlotIndex,
+            message:
+                'Bonus slot index $slot is out of range 1..${state.bonusSlotsConfig.maxSlots}.',
+          );
+        }
+        if (!state.isBonusSlotOpen(slot)) {
+          return TriPeaksRuleError(
+            code: TriPeaksErrorCode.bonusSlotClosed,
+            message: 'Bonus slot $slot is closed.',
+          );
+        }
+      }
       return null;
 
-    case RemoveTableauCardAction(index: final index):
+    case RemoveTableauCardAction(index: final index, targetSlot: final slot):
       if (index < 0 || index >= state.tableau.length) {
         return TriPeaksRuleError(
           code: TriPeaksErrorCode.invalidTableauIndex,
           message: 'Tableau index $index is out of range.',
         );
       }
-      if (!state.canRemoveTableau(index)) {
+      if (slot != null && !state.isBonusSlotIndexInRange(slot)) {
+        return TriPeaksRuleError(
+          code: TriPeaksErrorCode.invalidBonusSlotIndex,
+          message:
+              'Bonus slot index $slot is out of range 1..${state.bonusSlotsConfig.maxSlots}.',
+        );
+      }
+      if (slot != null && !state.isBonusSlotOpen(slot)) {
+        return TriPeaksRuleError(
+          code: TriPeaksErrorCode.bonusSlotClosed,
+          message: 'Bonus slot $slot is closed.',
+        );
+      }
+      if (!state.canRemoveTableau(index, targetSlot: slot)) {
         return TriPeaksRuleError(
           code: TriPeaksErrorCode.tableauCardNotRemovable,
           message: 'Tableau index $index is not removable.',
@@ -211,6 +249,44 @@ TriPeaksRuleError? _validateAction(TriPeaksState state, TriPeaksAction action) {
         );
       }
       return null;
+
+    case UseBonusSlotAction(slotIndex: final slotIndex):
+      if (slotIndex < 1 || slotIndex > state.bonusSlotsConfig.maxSlots) {
+        return TriPeaksRuleError(
+          code: TriPeaksErrorCode.invalidBonusSlotIndex,
+          message:
+              'Bonus slot index $slotIndex is out of range 1..${state.bonusSlotsConfig.maxSlots}.',
+        );
+      }
+      if (slotIndex > state.bonusSlotsState.openSlotsCount) {
+        return TriPeaksRuleError(
+          code: TriPeaksErrorCode.bonusSlotClosed,
+          message: 'Bonus slot $slotIndex is closed.',
+        );
+      }
+      return null;
+
+    case StrikeTimerExpiredAction(deadlineToken: final deadlineToken):
+      if (!state.strikeTimerConfig.enabled) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.strikeTimerDisabled,
+          message: 'Strike timer is disabled for this round.',
+        );
+      }
+      if (!state.strikeTimerState.isArmed) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.strikeTimerNotArmed,
+          message: 'Strike timer is not armed.',
+        );
+      }
+      if (deadlineToken != state.strikeTimerState.deadlineToken) {
+        return TriPeaksRuleError(
+          code: TriPeaksErrorCode.staleStrikeTimerExpiry,
+          message: 'Stale strike timer expiry token $deadlineToken (expected '
+              '${state.strikeTimerState.deadlineToken}).',
+        );
+      }
+      return null;
   }
 }
 
@@ -222,6 +298,10 @@ final class _TriPeaksSnapshot {
     required this.stock,
     required this.scoreState,
     required this.streakState,
+    required this.strikeTimerState,
+    required this.bonusSlotsState,
+    required this.lastSuccessfulTableauRank,
+    required this.clearedPeaksAwardedMask,
   });
 
   final List<Card> tableau;
@@ -230,6 +310,10 @@ final class _TriPeaksSnapshot {
   final List<Card> stock;
   final ScoreState scoreState;
   final StreakState streakState;
+  final StrikeTimerState strikeTimerState;
+  final BonusSlotsState bonusSlotsState;
+  final Rank? lastSuccessfulTableauRank;
+  final int clearedPeaksAwardedMask;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -241,6 +325,11 @@ final class _TriPeaksSnapshot {
       'stock': stock.map((card) => card.toMap()).toList(growable: false),
       'scoreState': scoreState.toMap(),
       'streakState': streakState.toMap(),
+      'strikeTimerState': strikeTimerState.toMap(),
+      'bonusSlotsState': bonusSlotsState.toMap(),
+      if (lastSuccessfulTableauRank case final rank?)
+        'lastSuccessfulTableauRank': rank.name,
+      'clearedPeaksAwardedMask': clearedPeaksAwardedMask,
     };
   }
 
@@ -295,6 +384,64 @@ final class _TriPeaksSnapshot {
     if (!streakResult.isSuccess) {
       return DecodeResult.failure(streakResult.error!);
     }
+    final strikeTimerStateMap = map['strikeTimerState'];
+    if (strikeTimerStateMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'strikeTimerState must be a map.',
+        ),
+      );
+    }
+    final strikeTimerResult = StrikeTimerState.tryFromMap(strikeTimerStateMap);
+    if (!strikeTimerResult.isSuccess) {
+      return DecodeResult.failure(strikeTimerResult.error!);
+    }
+    final bonusSlotsStateMap = map['bonusSlotsState'];
+    if (bonusSlotsStateMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'bonusSlotsState must be a map.',
+        ),
+      );
+    }
+    final bonusSlotsResult = BonusSlotsState.tryFromMap(bonusSlotsStateMap);
+    if (!bonusSlotsResult.isSuccess) {
+      return DecodeResult.failure(bonusSlotsResult.error!);
+    }
+    final lastSuccessfulTableauRank = map['lastSuccessfulTableauRank'];
+    if (lastSuccessfulTableauRank != null &&
+        lastSuccessfulTableauRank is! String) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'lastSuccessfulTableauRank must be a string when present.',
+        ),
+      );
+    }
+    Rank? decodedLastSuccessfulTableauRank;
+    if (lastSuccessfulTableauRank case final rankName?) {
+      try {
+        decodedLastSuccessfulTableauRank = Rank.values.byName(rankName);
+      } on Object catch (error) {
+        return DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'Invalid lastSuccessfulTableauRank: $error',
+          ),
+        );
+      }
+    }
+    final clearedPeaksAwardedMask = map['clearedPeaksAwardedMask'];
+    if (clearedPeaksAwardedMask is! int) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'clearedPeaksAwardedMask must be an int.',
+        ),
+      );
+    }
     return DecodeResult.success(
       _TriPeaksSnapshot(
         tableau: tableauResult.value!,
@@ -303,6 +450,10 @@ final class _TriPeaksSnapshot {
         stock: stockResult.value!,
         scoreState: scoreResult.value!,
         streakState: streakResult.value!,
+        strikeTimerState: strikeTimerResult.value!,
+        bonusSlotsState: bonusSlotsResult.value!,
+        lastSuccessfulTableauRank: decodedLastSuccessfulTableauRank,
+        clearedPeaksAwardedMask: clearedPeaksAwardedMask,
       ),
     );
   }

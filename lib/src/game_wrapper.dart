@@ -13,6 +13,8 @@ final class TriPeaksGame {
     RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
     UndoConfig undoConfig = const UndoConfig(),
     StreakConfig streakConfig = const StreakConfig(),
+    StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
+    BonusSlotsConfig bonusSlotsConfig = const BonusSlotsConfig(),
   }) : _session = TriPeaksSessionState.newSession(
           ruleset: ruleset,
           seed: seed,
@@ -21,6 +23,8 @@ final class TriPeaksGame {
           roundRulesConfig: roundRulesConfig,
           undoConfig: undoConfig,
           streakConfig: streakConfig,
+          strikeTimerConfig: strikeTimerConfig,
+          bonusSlotsConfig: bonusSlotsConfig,
         );
 
   TriPeaksSessionState _session;

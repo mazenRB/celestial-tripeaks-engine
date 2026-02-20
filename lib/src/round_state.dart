@@ -15,24 +15,40 @@ final class TriPeaksState {
     RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
     UndoConfig undoConfig = const UndoConfig(),
     StreakConfig streakConfig = const StreakConfig(),
+    StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
+    BonusSlotsConfig bonusSlotsConfig = const BonusSlotsConfig(),
   }) {
     final effectiveSeed = seed ?? defaultSeed;
     final workingDeck = deck == null
         ? (Card.standardDeck()..shuffle(Random(effectiveSeed)))
         : List<Card>.from(deck);
     _validateDeck(workingDeck);
+    final initialWaste = workingDeck[_tableauSize];
+    final initialBonusSlots = BonusSlotsState.initial.copyWith(
+      slots: <List<Card>>[
+        <Card>[initialWaste],
+        <Card>[],
+        <Card>[],
+      ],
+    );
 
     return TriPeaksState._(
       tableau: workingDeck.take(_tableauSize).toList(growable: false),
       removed: List<bool>.filled(_tableauSize, false, growable: false),
-      waste: <Card>[workingDeck[_tableauSize]],
+      waste: <Card>[initialWaste],
       stock: workingDeck.skip(_tableauSize + 1).toList(growable: false),
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
+      strikeTimerConfig: strikeTimerConfig,
+      bonusSlotsConfig: bonusSlotsConfig,
       scoreState: ScoreState.initial,
       streakState: StreakState.initial,
+      strikeTimerState: StrikeTimerState.initial,
+      bonusSlotsState: initialBonusSlots,
+      lastSuccessfulTableauRank: null,
+      clearedPeaksAwardedMask: 0,
       undoHistory: const <_TriPeaksSnapshot>[],
     );
   }
@@ -46,8 +62,14 @@ final class TriPeaksState {
     required this.roundRulesConfig,
     required this.undoConfig,
     required this.streakConfig,
+    required this.strikeTimerConfig,
+    required this.bonusSlotsConfig,
     required this.scoreState,
     required this.streakState,
+    required this.strikeTimerState,
+    required this.bonusSlotsState,
+    required this.lastSuccessfulTableauRank,
+    required this.clearedPeaksAwardedMask,
     required List<_TriPeaksSnapshot> undoHistory,
   })  : tableau = List<Card>.unmodifiable(tableau),
         removed = List<bool>.unmodifiable(removed),
@@ -95,7 +117,7 @@ final class TriPeaksState {
   /// Whether each tableau position has been removed.
   final List<bool> removed;
 
-  /// Waste pile from bottom to top.
+  /// Primary waste pile from bottom to top (bonus slot 1).
   final List<Card> waste;
 
   /// Stock pile from next-to-draw at index `0`.
@@ -113,11 +135,40 @@ final class TriPeaksState {
   /// Streak behavior config.
   final StreakConfig streakConfig;
 
+  /// Strike timer behavior config.
+  final StrikeTimerConfig strikeTimerConfig;
+
+  /// Bonus-slots behavior config.
+  final BonusSlotsConfig bonusSlotsConfig;
+
   /// Current scoring snapshot.
   final ScoreState scoreState;
 
   /// Current streak tracking snapshot.
   final StreakState streakState;
+
+  /// Current strike timer snapshot.
+  final StrikeTimerState strikeTimerState;
+
+  /// Current bonus-slots snapshot.
+  final BonusSlotsState bonusSlotsState;
+
+  /// Rank of the last successful tableau-to-slot move.
+  final Rank? lastSuccessfulTableauRank;
+
+  /// Bitmask tracking peaks already awarded with clear bonus.
+  final int clearedPeaksAwardedMask;
+
+  /// Peak IDs that already awarded clear bonus.
+  Set<int> get clearedPeaksAwarded {
+    final out = <int>{};
+    for (var peakId = 0; peakId < _peakDefinitions.length; peakId++) {
+      if (((clearedPeaksAwardedMask >> peakId) & 1) == 1) {
+        out.add(peakId);
+      }
+    }
+    return Set<int>.unmodifiable(out);
+  }
 
   /// Number of available undo steps.
   int get undoStepsAvailable => _undoHistory.length;
@@ -130,8 +181,8 @@ final class TriPeaksState {
   /// Number of cards currently in the waste pile.
   int get wasteCount => waste.length;
 
-  /// Top waste card used for adjacency checks.
-  Card get wasteTop => waste.last;
+  /// Top card of bonus slot 1 (legacy waste-top access).
+  Card get wasteTop => bonusSlotsState.slots.first.last;
 
   /// Returns a view of cards in tableau index order.
   ///
@@ -187,8 +238,11 @@ final class TriPeaksState {
     return _blockingIndices[index].every((blocker) => removed[blocker]);
   }
 
-  /// Returns `true` if [index] can be moved onto [wasteTop].
-  bool canRemoveTableau(int index) {
+  /// Returns `true` if [index] can be moved onto a target bonus slot.
+  ///
+  /// If [targetSlot] is omitted, this checks open slots in priority `1 -> 2 -> 3`
+  /// and returns `true` when at least one slot can accept the move.
+  bool canRemoveTableau(int index, {int? targetSlot}) {
     if (index < 0 || index >= _tableauSize) {
       return false;
     }
@@ -196,9 +250,57 @@ final class TriPeaksState {
       return false;
     }
     final candidate = tableau[index];
+    if (targetSlot case final explicitSlot?) {
+      final topCard = _slotTop(explicitSlot);
+      if (topCard == null) {
+        return false;
+      }
+      return _canPlaceOnSlotTop(candidate.rank, topCard);
+    }
+
+    for (var slot = 1; slot <= bonusSlotsState.openSlotsCount; slot++) {
+      final topCard = _slotTop(slot);
+      if (topCard == null) {
+        continue;
+      }
+      if (_canPlaceOnSlotTop(candidate.rank, topCard)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Returns whether [slotIndex] is a valid bonus slot index.
+  bool isBonusSlotIndexInRange(int slotIndex) {
+    return slotIndex >= 1 && slotIndex <= bonusSlotsConfig.maxSlots;
+  }
+
+  /// Returns whether [slotIndex] is currently open.
+  bool isBonusSlotOpen(int slotIndex) {
+    if (!isBonusSlotIndexInRange(slotIndex)) {
+      return false;
+    }
+    return slotIndex <= bonusSlotsState.openSlotsCount;
+  }
+
+  Card? _slotTop(int slotIndex) {
+    if (!isBonusSlotOpen(slotIndex)) {
+      return null;
+    }
+    final slot = bonusSlotsState.slots[slotIndex - 1];
+    if (slot.isEmpty) {
+      return null;
+    }
+    return slot.last;
+  }
+
+  bool _canPlaceOnSlotTop(Rank candidate, Card topCard) {
+    if (topCard.isJoker) {
+      return bonusSlotsConfig.jokerAcceptsAnyRank;
+    }
     return _areAdjacentRanks(
-      candidate.rank,
-      wasteTop.rank,
+      candidate,
+      topCard.rank,
       roundRulesConfig,
     );
   }
@@ -213,19 +315,36 @@ final class TriPeaksState {
     List<Card>? stock,
     ScoreState? scoreState,
     StreakState? streakState,
+    BonusSlotsState? bonusSlotsState,
+    StrikeTimerState? strikeTimerState,
+    Rank? lastSuccessfulTableauRank,
+    bool clearLastSuccessfulTableauRank = false,
+    int? clearedPeaksAwardedMask,
     List<_TriPeaksSnapshot>? undoHistory,
   }) {
+    final nextBonusSlotsState = bonusSlotsState ?? this.bonusSlotsState;
+    final syncedWaste =
+        waste ?? List<Card>.unmodifiable(nextBonusSlotsState.slots.first);
     return TriPeaksState._(
       tableau: tableau ?? this.tableau,
       removed: removed ?? this.removed,
-      waste: waste ?? this.waste,
+      waste: syncedWaste,
       stock: stock ?? this.stock,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
+      strikeTimerConfig: strikeTimerConfig,
+      bonusSlotsConfig: bonusSlotsConfig,
       scoreState: scoreState ?? this.scoreState,
       streakState: streakState ?? this.streakState,
+      strikeTimerState: strikeTimerState ?? this.strikeTimerState,
+      bonusSlotsState: bonusSlotsState ?? this.bonusSlotsState,
+      lastSuccessfulTableauRank: clearLastSuccessfulTableauRank
+          ? null
+          : (lastSuccessfulTableauRank ?? this.lastSuccessfulTableauRank),
+      clearedPeaksAwardedMask:
+          clearedPeaksAwardedMask ?? this.clearedPeaksAwardedMask,
       undoHistory: undoHistory ?? _undoHistory,
     );
   }
@@ -238,6 +357,10 @@ final class TriPeaksState {
       stock: stock,
       scoreState: scoreState,
       streakState: streakState,
+      strikeTimerState: strikeTimerState,
+      bonusSlotsState: bonusSlotsState,
+      lastSuccessfulTableauRank: lastSuccessfulTableauRank,
+      clearedPeaksAwardedMask: clearedPeaksAwardedMask,
     );
   }
 
@@ -249,6 +372,10 @@ final class TriPeaksState {
       stock: snapshot.stock,
       scoreState: snapshot.scoreState,
       streakState: snapshot.streakState,
+      strikeTimerState: snapshot.strikeTimerState,
+      bonusSlotsState: snapshot.bonusSlotsState,
+      lastSuccessfulTableauRank: snapshot.lastSuccessfulTableauRank,
+      clearedPeaksAwardedMask: snapshot.clearedPeaksAwardedMask,
     );
   }
 
@@ -264,6 +391,12 @@ final class TriPeaksState {
         (left == Rank.king && right == Rank.ace);
     return rules.aceKingWrapAround && wrap;
   }
+
+  static const List<List<int>> _peakDefinitions = <List<int>>[
+    <int>[0, 3, 4, 9, 10, 11, 18, 19, 20, 21],
+    <int>[1, 5, 6, 12, 13, 14, 21, 22, 23, 24],
+    <int>[2, 7, 8, 15, 16, 17, 24, 25, 26, 27],
+  ];
 
   static void _validateDeck(List<Card> deck) {
     if (deck.length != 52) {
@@ -294,8 +427,15 @@ final class TriPeaksState {
       'roundRulesConfig': roundRulesConfig.toMap(),
       'undoConfig': undoConfig.toMap(),
       'streakConfig': streakConfig.toMap(),
+      'strikeTimerConfig': strikeTimerConfig.toMap(),
+      'bonusSlotsConfig': bonusSlotsConfig.toMap(),
       'scoreState': scoreState.toMap(),
       'streakState': streakState.toMap(),
+      'strikeTimerState': strikeTimerState.toMap(),
+      'bonusSlotsState': bonusSlotsState.toMap(),
+      if (lastSuccessfulTableauRank case final rank?)
+        'lastSuccessfulTableauRank': rank.name,
+      'clearedPeaksAwardedMask': clearedPeaksAwardedMask,
       'undoHistory': _undoHistory
           .map((snapshot) => snapshot.toMap())
           .toList(growable: false),
@@ -396,6 +536,36 @@ final class TriPeaksState {
     if (!streakConfigResult.isSuccess) {
       return DecodeResult.failure(streakConfigResult.error!);
     }
+    final strikeTimerConfigMap = map['strikeTimerConfig'];
+    if (strikeTimerConfigMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'strikeTimerConfig must be a map.',
+        ),
+      );
+    }
+    final strikeTimerConfigResult = StrikeTimerConfig.tryFromMap(
+      strikeTimerConfigMap,
+    );
+    if (!strikeTimerConfigResult.isSuccess) {
+      return DecodeResult.failure(strikeTimerConfigResult.error!);
+    }
+    final bonusSlotsConfigMap = map['bonusSlotsConfig'];
+    if (bonusSlotsConfigMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'bonusSlotsConfig must be a map.',
+        ),
+      );
+    }
+    final bonusSlotsConfigResult = BonusSlotsConfig.tryFromMap(
+      bonusSlotsConfigMap,
+    );
+    if (!bonusSlotsConfigResult.isSuccess) {
+      return DecodeResult.failure(bonusSlotsConfigResult.error!);
+    }
     final scoreStateMap = map['scoreState'];
     if (scoreStateMap is! Map<String, dynamic>) {
       return const DecodeResult.failure(
@@ -421,6 +591,68 @@ final class TriPeaksState {
     final streakStateResult = StreakState.tryFromMap(streakStateMap);
     if (!streakStateResult.isSuccess) {
       return DecodeResult.failure(streakStateResult.error!);
+    }
+    final strikeTimerStateMap = map['strikeTimerState'];
+    if (strikeTimerStateMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'strikeTimerState must be a map.',
+        ),
+      );
+    }
+    final strikeTimerStateResult = StrikeTimerState.tryFromMap(
+      strikeTimerStateMap,
+    );
+    if (!strikeTimerStateResult.isSuccess) {
+      return DecodeResult.failure(strikeTimerStateResult.error!);
+    }
+    final lastSuccessfulTableauRank = map['lastSuccessfulTableauRank'];
+    if (lastSuccessfulTableauRank != null &&
+        lastSuccessfulTableauRank is! String) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'lastSuccessfulTableauRank must be a string when present.',
+        ),
+      );
+    }
+    Rank? decodedLastSuccessfulTableauRank;
+    if (lastSuccessfulTableauRank case final rankName?) {
+      try {
+        decodedLastSuccessfulTableauRank = Rank.values.byName(rankName);
+      } on Object catch (error) {
+        return DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'Invalid lastSuccessfulTableauRank: $error',
+          ),
+        );
+      }
+    }
+    final bonusSlotsStateMap = map['bonusSlotsState'];
+    if (bonusSlotsStateMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'bonusSlotsState must be a map.',
+        ),
+      );
+    }
+    final bonusSlotsStateResult = BonusSlotsState.tryFromMap(
+      bonusSlotsStateMap,
+    );
+    if (!bonusSlotsStateResult.isSuccess) {
+      return DecodeResult.failure(bonusSlotsStateResult.error!);
+    }
+    final clearedPeaksAwardedMask = map['clearedPeaksAwardedMask'];
+    if (clearedPeaksAwardedMask != null && clearedPeaksAwardedMask is! int) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'clearedPeaksAwardedMask must be int when present.',
+        ),
+      );
     }
 
     final historyRaw = map['undoHistory'];
@@ -449,18 +681,40 @@ final class TriPeaksState {
       history.add(snapshotResult.value!);
     }
 
+    final decodedBonusSlots = bonusSlotsStateResult.value!;
+    final normalizedSlots = <List<Card>>[
+      ...decodedBonusSlots.slots,
+    ];
+    if (normalizedSlots.first.isEmpty && wasteResult.value!.isNotEmpty) {
+      normalizedSlots[0] = wasteResult.value!;
+    }
+    final normalizedBonusSlots = decodedBonusSlots.copyWith(
+      slots: List<List<Card>>.unmodifiable(
+        normalizedSlots
+            .map((slot) => List<Card>.unmodifiable(slot))
+            .toList(growable: false),
+      ),
+    );
+    final normalizedWaste = List<Card>.unmodifiable(normalizedSlots.first);
+
     return DecodeResult.success(
       TriPeaksState._(
         tableau: tableauResult.value!,
         removed: removed.cast<bool>(),
-        waste: wasteResult.value!,
+        waste: normalizedWaste,
         stock: stockResult.value!,
         scoreConfig: scoreConfigResult.value!,
         roundRulesConfig: roundRulesResult.value!,
         undoConfig: undoConfigResult.value!,
         streakConfig: streakConfigResult.value!,
+        strikeTimerConfig: strikeTimerConfigResult.value!,
+        bonusSlotsConfig: bonusSlotsConfigResult.value!,
         scoreState: scoreStateResult.value!,
         streakState: streakStateResult.value!,
+        strikeTimerState: strikeTimerStateResult.value!,
+        bonusSlotsState: normalizedBonusSlots,
+        lastSuccessfulTableauRank: decodedLastSuccessfulTableauRank,
+        clearedPeaksAwardedMask: clearedPeaksAwardedMask as int? ?? 0,
         undoHistory: history,
       ),
     );
@@ -494,5 +748,3 @@ final class TriPeaksState {
     return DecodeResult.success(List<Card>.unmodifiable(cards));
   }
 }
-
-/// Immutable state for a multi-round TriPeaks session.

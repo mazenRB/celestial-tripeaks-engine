@@ -6,6 +6,11 @@ enum TriPeaksErrorCode {
   emptyStock,
   undoDisabled,
   nothingToUndo,
+  invalidBonusSlotIndex,
+  bonusSlotClosed,
+  strikeTimerDisabled,
+  strikeTimerNotArmed,
+  staleStrikeTimerExpiry,
 }
 
 /// Error codes for hint query failures.
@@ -309,7 +314,10 @@ sealed class TriPeaksAction {
 /// Action that draws one card from stock to waste.
 final class DrawFromStockAction extends TriPeaksAction {
   /// Creates a stock draw action.
-  const DrawFromStockAction();
+  const DrawFromStockAction({this.targetSlot});
+
+  /// Optional bonus-slot target (1-based). If omitted, slot priority applies.
+  final int? targetSlot;
 
   /// Serializes action to JSON-friendly map.
   Map<String, dynamic> toMap() => roundActionToMap(this);
@@ -318,10 +326,13 @@ final class DrawFromStockAction extends TriPeaksAction {
 /// Action that removes one exposed tableau card to waste.
 final class RemoveTableauCardAction extends TriPeaksAction {
   /// Creates a card-removal action at [index].
-  const RemoveTableauCardAction(this.index);
+  const RemoveTableauCardAction(this.index, {this.targetSlot});
 
   /// The tableau index to remove.
   final int index;
+
+  /// Optional bonus-slot target (1-based). If omitted, slot priority applies.
+  final int? targetSlot;
 
   /// Serializes action to JSON-friendly map.
   Map<String, dynamic> toMap() => roundActionToMap(this);
@@ -331,6 +342,30 @@ final class RemoveTableauCardAction extends TriPeaksAction {
 final class UndoAction extends TriPeaksAction {
   /// Creates an undo action.
   const UndoAction();
+
+  /// Serializes action to JSON-friendly map.
+  Map<String, dynamic> toMap() => roundActionToMap(this);
+}
+
+/// Action that explicitly uses one bonus slot by index (1-based).
+final class UseBonusSlotAction extends TriPeaksAction {
+  /// Creates a bonus-slot usage action.
+  const UseBonusSlotAction(this.slotIndex);
+
+  /// Target slot index in range `1..3`.
+  final int slotIndex;
+
+  /// Serializes action to JSON-friendly map.
+  Map<String, dynamic> toMap() => roundActionToMap(this);
+}
+
+/// Action that requests strike-expiry processing for [deadlineToken].
+final class StrikeTimerExpiredAction extends TriPeaksAction {
+  /// Creates a strike-expiry action.
+  const StrikeTimerExpiredAction({required this.deadlineToken});
+
+  /// The deadline token expected by the sender.
+  final int deadlineToken;
 
   /// Serializes action to JSON-friendly map.
   Map<String, dynamic> toMap() => roundActionToMap(this);

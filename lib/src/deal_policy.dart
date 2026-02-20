@@ -154,6 +154,8 @@ DealGenerationResult newGameWithDealPolicy(
   RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
   UndoConfig undoConfig = const UndoConfig(),
   StreakConfig streakConfig = const StreakConfig(),
+  StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
+  BonusSlotsConfig bonusSlotsConfig = const BonusSlotsConfig(),
   DealPolicyConfig dealPolicy = const DealPolicyConfig(),
 }) {
   switch (dealPolicy.mode) {
@@ -164,6 +166,8 @@ DealGenerationResult newGameWithDealPolicy(
         roundRulesConfig: roundRulesConfig,
         undoConfig: undoConfig,
         streakConfig: streakConfig,
+        strikeTimerConfig: strikeTimerConfig,
+        bonusSlotsConfig: bonusSlotsConfig,
       );
       return DealGenerationResult(
         state: state,
@@ -184,6 +188,8 @@ DealGenerationResult newGameWithDealPolicy(
           roundRulesConfig: roundRulesConfig,
           undoConfig: undoConfig,
           streakConfig: streakConfig,
+          strikeTimerConfig: strikeTimerConfig,
+          bonusSlotsConfig: bonusSlotsConfig,
         );
         if (isDealSolvable(
           state,
@@ -214,6 +220,8 @@ DealGenerationResult newDailyGameWithDealPolicy(
   RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
   UndoConfig undoConfig = const UndoConfig(),
   StreakConfig streakConfig = const StreakConfig(),
+  StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
+  BonusSlotsConfig bonusSlotsConfig = const BonusSlotsConfig(),
   DealPolicyConfig dealPolicy = const DealPolicyConfig(),
 }) {
   final baseSeed = dailySeedForDate(date, dailyConfig);
@@ -223,6 +231,8 @@ DealGenerationResult newDailyGameWithDealPolicy(
     roundRulesConfig: roundRulesConfig,
     undoConfig: undoConfig,
     streakConfig: streakConfig,
+    strikeTimerConfig: strikeTimerConfig,
+    bonusSlotsConfig: bonusSlotsConfig,
     dealPolicy: dealPolicy,
   );
 }

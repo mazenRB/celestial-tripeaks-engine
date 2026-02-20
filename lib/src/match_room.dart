@@ -34,6 +34,8 @@ final class MatchConfig {
     this.roundRulesConfig = const RoundRulesConfig(),
     this.undoConfig = const UndoConfig(),
     this.streakConfig = const StreakConfig(),
+    this.strikeTimerConfig = const StrikeTimerConfig(),
+    this.bonusSlotsConfig = const BonusSlotsConfig(),
     this.dealPolicyConfig = const DealPolicyConfig(),
     this.engineVersion = 1,
   }) : assert(maxPlayers > 0);
@@ -65,6 +67,12 @@ final class MatchConfig {
   /// Shared streak config.
   final StreakConfig streakConfig;
 
+  /// Shared strike timer config.
+  final StrikeTimerConfig strikeTimerConfig;
+
+  /// Shared bonus-slots config.
+  final BonusSlotsConfig bonusSlotsConfig;
+
   /// Shared deal policy config.
   final DealPolicyConfig dealPolicyConfig;
 
@@ -85,6 +93,8 @@ final class MatchConfig {
       'roundRulesConfig': roundRulesConfig.toMap(),
       'undoConfig': undoConfig.toMap(),
       'streakConfig': streakConfig.toMap(),
+      'strikeTimerConfig': strikeTimerConfig.toMap(),
+      'bonusSlotsConfig': bonusSlotsConfig.toMap(),
       'dealPolicyConfig': dealPolicyConfig.toMap(),
       'engineVersion': engineVersion,
     };
@@ -114,12 +124,16 @@ final class MatchConfig {
     final roundRulesMap = map['roundRulesConfig'];
     final undoMap = map['undoConfig'];
     final streakMap = map['streakConfig'];
+    final strikeTimerMap = map['strikeTimerConfig'];
+    final bonusSlotsMap = map['bonusSlotsConfig'];
     final dealPolicyMap = map['dealPolicyConfig'];
     if (rulesetMap is! Map<String, dynamic> ||
         scoreMap is! Map<String, dynamic> ||
         roundRulesMap is! Map<String, dynamic> ||
         undoMap is! Map<String, dynamic> ||
         streakMap is! Map<String, dynamic> ||
+        strikeTimerMap is! Map<String, dynamic> ||
+        bonusSlotsMap is! Map<String, dynamic> ||
         dealPolicyMap is! Map<String, dynamic>) {
       return const DecodeResult.failure(
         DecodeFailure(
@@ -148,6 +162,14 @@ final class MatchConfig {
     final streakResult = StreakConfig.tryFromMap(streakMap);
     if (!streakResult.isSuccess) {
       return DecodeResult.failure(streakResult.error!);
+    }
+    final strikeTimerResult = StrikeTimerConfig.tryFromMap(strikeTimerMap);
+    if (!strikeTimerResult.isSuccess) {
+      return DecodeResult.failure(strikeTimerResult.error!);
+    }
+    final bonusSlotsResult = BonusSlotsConfig.tryFromMap(bonusSlotsMap);
+    if (!bonusSlotsResult.isSuccess) {
+      return DecodeResult.failure(bonusSlotsResult.error!);
     }
     final dealPolicyResult = DealPolicyConfig.tryFromMap(dealPolicyMap);
     if (!dealPolicyResult.isSuccess) {
@@ -184,6 +206,8 @@ final class MatchConfig {
           roundRulesConfig: roundRulesResult.value!,
           undoConfig: undoResult.value!,
           streakConfig: streakResult.value!,
+          strikeTimerConfig: strikeTimerResult.value!,
+          bonusSlotsConfig: bonusSlotsResult.value!,
           dealPolicyConfig: dealPolicyResult.value!,
           engineVersion: engineVersion,
         ),
@@ -369,6 +393,7 @@ final class MatchState {
     required this.matchStatus,
     required this.authoritativeSequence,
     required this.players,
+    this.finalResult,
   });
 
   /// Creates initial waiting match state.
@@ -380,6 +405,7 @@ final class MatchState {
       matchStatus: MatchStatus.waiting,
       authoritativeSequence: 0,
       players: const <MatchPlayerState>[],
+      finalResult: null,
     );
   }
 
@@ -401,10 +427,15 @@ final class MatchState {
   /// Player states in deterministic join order.
   final List<MatchPlayerState> players;
 
+  /// Immutable final match result once finalized.
+  final FinalMatchResult? finalResult;
+
   MatchState _copyWith({
     MatchStatus? matchStatus,
     int? authoritativeSequence,
     List<MatchPlayerState>? players,
+    FinalMatchResult? finalResult,
+    bool clearFinalResult = false,
   }) {
     return MatchState(
       schemaVersion: schemaVersion,
@@ -414,6 +445,7 @@ final class MatchState {
       authoritativeSequence:
           authoritativeSequence ?? this.authoritativeSequence,
       players: List<MatchPlayerState>.unmodifiable(players ?? this.players),
+      finalResult: clearFinalResult ? null : (finalResult ?? this.finalResult),
     );
   }
 
@@ -428,6 +460,7 @@ final class MatchState {
       'authoritativeSequence': authoritativeSequence,
       'players':
           players.map((player) => player.toMap()).toList(growable: false),
+      if (finalResult case final value?) 'finalResult': value.toMap(),
     };
   }
 
@@ -468,6 +501,7 @@ final class MatchState {
     final engineVersion = map['engineVersion'];
     final seq = map['authoritativeSequence'];
     final playersRaw = map['players'];
+    final finalResultRaw = map['finalResult'];
     if (statusName is! String ||
         engineVersion is! int ||
         seq is! int ||
@@ -497,6 +531,23 @@ final class MatchState {
       players.add(playerResult.value!);
     }
 
+    FinalMatchResult? finalResult;
+    if (finalResultRaw != null) {
+      if (finalResultRaw is! Map<String, dynamic>) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'finalResult must be a map when present.',
+          ),
+        );
+      }
+      final finalResultDecode = FinalMatchResult.tryFromMap(finalResultRaw);
+      if (!finalResultDecode.isSuccess) {
+        return DecodeResult.failure(finalResultDecode.error!);
+      }
+      finalResult = finalResultDecode.value!;
+    }
+
     try {
       return DecodeResult.success(
         MatchState(
@@ -506,6 +557,7 @@ final class MatchState {
           matchStatus: MatchStatus.values.byName(statusName),
           authoritativeSequence: seq,
           players: List<MatchPlayerState>.unmodifiable(players),
+          finalResult: finalResult,
         ),
       );
     } on Object catch (error) {
@@ -878,6 +930,8 @@ MatchReduceResult tryReduceMatch(MatchState state, MatchEvent event) {
           roundRulesConfig: state.config.roundRulesConfig,
           undoConfig: state.config.undoConfig,
           streakConfig: state.config.streakConfig,
+          strikeTimerConfig: state.config.strikeTimerConfig,
+          bonusSlotsConfig: state.config.bonusSlotsConfig,
           dealPolicy: state.config.dealPolicyConfig,
         );
         if (!deal.isSuccess) {
@@ -898,6 +952,8 @@ MatchReduceResult tryReduceMatch(MatchState state, MatchEvent event) {
           roundRulesConfig: state.config.roundRulesConfig,
           undoConfig: state.config.undoConfig,
           streakConfig: state.config.streakConfig,
+          strikeTimerConfig: state.config.strikeTimerConfig,
+          bonusSlotsConfig: state.config.bonusSlotsConfig,
         );
         final replay = ReplaySession.newSession(
           seed: session.seed ?? TriPeaksSessionState.defaultSeed,
@@ -906,6 +962,8 @@ MatchReduceResult tryReduceMatch(MatchState state, MatchEvent event) {
           roundRulesConfig: session.roundRulesConfig,
           undoConfig: session.undoConfig,
           streakConfig: session.streakConfig,
+          strikeTimerConfig: session.strikeTimerConfig,
+          bonusSlotsConfig: session.bonusSlotsConfig,
         );
         final initialized = session._copyWith(currentRound: round);
         nextPlayers.add(
@@ -932,6 +990,15 @@ MatchReduceResult tryReduceMatch(MatchState state, MatchEvent event) {
         action: final action,
         clientSeq: final clientSeq,
       ):
+      if (state.matchStatus == MatchStatus.finished) {
+        return MatchReduceResult(
+          state: state,
+          failure: const MatchReduceFailure(
+            code: MatchReduceFailureCode.matchAlreadyFinished,
+            message: 'Match is already finished.',
+          ),
+        );
+      }
       if (state.matchStatus != MatchStatus.active) {
         return MatchReduceResult(
           state: state,
@@ -978,6 +1045,8 @@ MatchReduceResult tryReduceMatch(MatchState state, MatchEvent event) {
               roundRulesConfig: player.session!.roundRulesConfig,
               undoConfig: player.session!.undoConfig,
               streakConfig: player.session!.streakConfig,
+              strikeTimerConfig: player.session!.strikeTimerConfig,
+              bonusSlotsConfig: player.session!.bonusSlotsConfig,
             ),
         action,
         reduceResult,

@@ -17,6 +17,8 @@ TriPeaksState newDailyGame(
   RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
   UndoConfig undoConfig = const UndoConfig(),
   StreakConfig streakConfig = const StreakConfig(),
+  StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
+  BonusSlotsConfig bonusSlotsConfig = const BonusSlotsConfig(),
 }) {
   return TriPeaksState.newGame(
     seed: dailySeedForDate(date, config),
@@ -24,6 +26,8 @@ TriPeaksState newDailyGame(
     roundRulesConfig: roundRulesConfig,
     undoConfig: undoConfig,
     streakConfig: streakConfig,
+    strikeTimerConfig: strikeTimerConfig,
+    bonusSlotsConfig: bonusSlotsConfig,
   );
 }
 
@@ -35,6 +39,8 @@ TriPeaksSessionState newDailySession(
   RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
   UndoConfig undoConfig = const UndoConfig(),
   StreakConfig streakConfig = const StreakConfig(),
+  StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
+  BonusSlotsConfig bonusSlotsConfig = const BonusSlotsConfig(),
 }) {
   final ruleset = _rulesetFromDailyConfig(config);
   return TriPeaksSessionState.newSession(
@@ -44,6 +50,8 @@ TriPeaksSessionState newDailySession(
     roundRulesConfig: roundRulesConfig,
     undoConfig: undoConfig,
     streakConfig: streakConfig,
+    strikeTimerConfig: strikeTimerConfig,
+    bonusSlotsConfig: bonusSlotsConfig,
   );
 }
 

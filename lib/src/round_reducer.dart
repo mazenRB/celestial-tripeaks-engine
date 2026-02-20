@@ -23,6 +23,11 @@ TriPeaksState reduceTriPeaks(
       case TriPeaksErrorCode.emptyStock:
       case TriPeaksErrorCode.undoDisabled:
       case TriPeaksErrorCode.nothingToUndo:
+      case TriPeaksErrorCode.invalidBonusSlotIndex:
+      case TriPeaksErrorCode.bonusSlotClosed:
+      case TriPeaksErrorCode.strikeTimerDisabled:
+      case TriPeaksErrorCode.strikeTimerNotArmed:
+      case TriPeaksErrorCode.staleStrikeTimerExpiry:
         throw StateError(error.message);
     }
   }
@@ -43,7 +48,10 @@ TriPeaksReduceResult tryReduceTriPeaks(
   final error = _validateAction(preprocessed, action);
   if (error != null) {
     if (error.code == TriPeaksErrorCode.undoDisabled ||
-        error.code == TriPeaksErrorCode.nothingToUndo) {
+        error.code == TriPeaksErrorCode.nothingToUndo ||
+        error.code == TriPeaksErrorCode.strikeTimerDisabled ||
+        error.code == TriPeaksErrorCode.strikeTimerNotArmed ||
+        error.code == TriPeaksErrorCode.staleStrikeTimerExpiry) {
       return TriPeaksReduceResult(
         state: preprocessed,
         scoreDelta: 0,
@@ -52,14 +60,26 @@ TriPeaksReduceResult tryReduceTriPeaks(
     }
     final penalty = preprocessed.scoreConfig.penaltyInvalidAction;
     var nextStreakState = preprocessed.streakState;
+    var nextStrikeTimerState = preprocessed.strikeTimerState;
     if (preprocessed.streakConfig.enabled &&
         preprocessed.streakConfig.resetOnInvalidAction) {
       nextStreakState = nextStreakState.copyWith(currentStreak: 0);
+      nextStrikeTimerState = _onStreakEndedStrikeTimer(
+        preprocessed.strikeTimerState,
+        preprocessed.strikeTimerConfig,
+      );
     }
+    final nextBonusSlotsState = _onInvalidActionBonusSlots(
+      preprocessed.bonusSlotsState,
+      preprocessed.bonusSlotsConfig,
+      nextStreakState,
+    );
     return TriPeaksReduceResult(
       state: preprocessed._copyWith(
         scoreState: preprocessed.scoreState.applyDelta(penalty),
         streakState: nextStreakState,
+        strikeTimerState: nextStrikeTimerState,
+        bonusSlotsState: nextBonusSlotsState,
       ),
       scoreDelta: penalty,
       error: error,
@@ -83,43 +103,123 @@ TriPeaksReduceResult tryReduceTriPeaks(
   required int effectiveTick,
 }) {
   switch (action) {
-    case DrawFromStockAction():
+    case DrawFromStockAction(targetSlot: final targetSlot):
       final delta = state.scoreConfig.pointsDrawFromStock;
       final nextHistory = _pushUndoSnapshot(state);
       final nextStreak = _onSuccessfulDraw(
         state.streakState,
         state.streakConfig,
       );
+      final nextStrikeTimer = _onStreakEndedStrikeTimer(
+        state.strikeTimerState,
+        state.strikeTimerConfig,
+      );
+      final selectedSlot = _resolveTargetSlotForDraw(state, targetSlot);
+      final drawnCard = state.stock.first;
+      final nextSlots = _appendCardToSlot(
+        state.bonusSlotsState.slots,
+        selectedSlot,
+        drawnCard,
+      );
+      final nextBonusSlotsState = _onDrawBonusSlots(
+        state.bonusSlotsState.copyWith(slots: nextSlots),
+        state.bonusSlotsConfig,
+        nextStreak,
+      );
       return (
         state: state._copyWith(
-          waste: <Card>[...state.waste, state.stock.first],
           stock: state.stock.skip(1).toList(growable: false),
           scoreState: state.scoreState.applyDelta(delta),
           streakState: nextStreak,
+          strikeTimerState: nextStrikeTimer,
+          bonusSlotsState: nextBonusSlotsState,
           undoHistory: nextHistory,
         ),
         scoreDelta: delta,
       );
 
-    case RemoveTableauCardAction(index: final index):
-      final delta = state.scoreConfig.pointsTableauToWaste;
+    case RemoveTableauCardAction(
+        index: final index,
+        targetSlot: final targetSlot
+      ):
       final nextHistory = _pushUndoSnapshot(state);
       final nextRemoved = state.removed.toList(growable: false);
       nextRemoved[index] = true;
+      final peakBonus = _computePeakClearBonus(
+        nextRemoved,
+        state.clearedPeaksAwardedMask,
+      );
+      final delta = state.scoreConfig.pointsTableauToWaste +
+          (state.scoreConfig.pointsPeakCleared * peakBonus.newlyClearedCount);
       final nextStreak = _onSuccessfulTableauMove(
         state.streakState,
         state.streakConfig,
         effectiveTick,
       );
+      final nextStrikeTimer = _onStreakAdvancedStrikeTimer(
+        state.strikeTimerState,
+        state.strikeTimerConfig,
+      );
+      final selectedSlot = _resolveTargetSlotForTableauMove(
+        state,
+        index,
+        targetSlot,
+      );
+      final nextSlots = _appendTableauCardToSlot(
+        state.bonusSlotsState.slots,
+        selectedSlot,
+        state.tableau[index],
+        state.bonusSlotsConfig,
+      );
+      final nextBonusSlotsState = _withRecomputedOpenSlotsAndSpawn(
+        state.bonusSlotsState.copyWith(slots: nextSlots),
+        state.bonusSlotsConfig,
+        nextStreak,
+        state.tableau[index].rank,
+      );
       return (
         state: state._copyWith(
           removed: nextRemoved,
-          waste: <Card>[...state.waste, state.tableau[index]],
           scoreState: state.scoreState.applyDelta(delta),
           streakState: nextStreak,
+          strikeTimerState: nextStrikeTimer,
+          bonusSlotsState: nextBonusSlotsState,
+          lastSuccessfulTableauRank: state.tableau[index].rank,
+          clearedPeaksAwardedMask: peakBonus.nextAwardedMask,
           undoHistory: nextHistory,
         ),
         scoreDelta: delta,
+      );
+
+    case UseBonusSlotAction(slotIndex: final slotIndex):
+      final nextHistory = _pushUndoSnapshot(state);
+      final nextBonusSlotsState = state.bonusSlotsState.copyWith(
+        lastUsedSlot: slotIndex,
+      );
+      return (
+        state: state._copyWith(
+          bonusSlotsState: nextBonusSlotsState,
+          undoHistory: nextHistory,
+        ),
+        scoreDelta: 0,
+      );
+
+    case StrikeTimerExpiredAction():
+      final nextHistory = _pushUndoSnapshot(state);
+      final endedStreak = state.streakState.copyWith(currentStreak: 0);
+      final nextStrikeTimer = _onStreakEndedStrikeTimer(
+        state.strikeTimerState,
+        state.strikeTimerConfig,
+      );
+      final nextBonusSlotsState = _withOpenSlotsCount(state.bonusSlotsState, 1);
+      return (
+        state: state._copyWith(
+          streakState: endedStreak,
+          strikeTimerState: nextStrikeTimer,
+          bonusSlotsState: nextBonusSlotsState,
+          undoHistory: nextHistory,
+        ),
+        scoreDelta: 0,
       );
 
     case UndoAction():
@@ -133,6 +233,35 @@ TriPeaksReduceResult tryReduceTriPeaks(
         scoreDelta: 0,
       );
   }
+}
+
+({int newlyClearedCount, int nextAwardedMask}) _computePeakClearBonus(
+  List<bool> removed,
+  int awardedMask,
+) {
+  var newlyClearedCount = 0;
+  var nextMask = awardedMask;
+
+  for (var peakId = 0;
+      peakId < TriPeaksState._peakDefinitions.length;
+      peakId++) {
+    final alreadyAwarded = ((nextMask >> peakId) & 1) == 1;
+    if (alreadyAwarded) {
+      continue;
+    }
+    final peakSlots = TriPeaksState._peakDefinitions[peakId];
+    final isCleared = peakSlots.every((index) => removed[index]);
+    if (!isCleared) {
+      continue;
+    }
+    nextMask |= (1 << peakId);
+    newlyClearedCount++;
+  }
+
+  return (
+    newlyClearedCount: newlyClearedCount,
+    nextAwardedMask: nextMask,
+  );
 }
 
 List<_TriPeaksSnapshot> _pushUndoSnapshot(TriPeaksState state) {
@@ -161,11 +290,265 @@ TriPeaksState _applyGapResetIfNeeded(TriPeaksState state, int tick) {
     return state;
   }
   if (tick - lastTick > config.maxGapTicks!) {
+    final nextStreakState = state.streakState.copyWith(currentStreak: 0);
+    final nextStrikeTimer = _onStreakEndedStrikeTimer(
+      state.strikeTimerState,
+      state.strikeTimerConfig,
+    );
+    final nextBonusSlotsState = _withRecomputedOpenSlots(
+      state.bonusSlotsState,
+      state.bonusSlotsConfig,
+      nextStreakState,
+    );
     return state._copyWith(
-      streakState: state.streakState.copyWith(currentStreak: 0),
+      streakState: nextStreakState,
+      strikeTimerState: nextStrikeTimer,
+      bonusSlotsState: nextBonusSlotsState,
     );
   }
   return state;
+}
+
+BonusSlotsState _withRecomputedOpenSlots(
+  BonusSlotsState state,
+  BonusSlotsConfig config,
+  StreakState streakState,
+) {
+  final openSlotsCount = _computeOpenSlotsCount(streakState, config);
+  return _withOpenSlotsCount(state, openSlotsCount);
+}
+
+BonusSlotsState _withRecomputedOpenSlotsAndSpawn(
+  BonusSlotsState state,
+  BonusSlotsConfig config,
+  StreakState streakState,
+  Rank? lastSuccessfulTableauRank,
+) {
+  final openSlotsCount = _computeOpenSlotsCount(streakState, config);
+  if (openSlotsCount <= state.openSlotsCount) {
+    return _withOpenSlotsCount(state, openSlotsCount);
+  }
+
+  final nextSlots = <List<Card>>[
+    List<Card>.from(state.slots[0]),
+    List<Card>.from(state.slots[1]),
+    List<Card>.from(state.slots[2]),
+  ];
+
+  for (var slotIndex = state.openSlotsCount + 1;
+      slotIndex <= openSlotsCount;
+      slotIndex++) {
+    if (nextSlots[slotIndex - 1].isEmpty) {
+      nextSlots[slotIndex - 1].add(
+        _spawnOpenSlotAnchor(config, lastSuccessfulTableauRank),
+      );
+    }
+  }
+
+  return state.copyWith(
+    openSlotsCount: openSlotsCount,
+    slots: List<List<Card>>.unmodifiable(
+      nextSlots.map((slot) => List<Card>.unmodifiable(slot)).toList(),
+    ),
+  );
+}
+
+BonusSlotsState _onDrawBonusSlots(
+  BonusSlotsState state,
+  BonusSlotsConfig config,
+  StreakState streakState,
+) {
+  if (!config.enabled) {
+    return _withOpenSlotsCount(state, 1);
+  }
+  if (config.closeOnDraw) {
+    return _withOpenSlotsCount(
+      state,
+      _computeOpenSlotsCount(streakState, config),
+    );
+  }
+  return _withRecomputedOpenSlots(state, config, streakState);
+}
+
+BonusSlotsState _onInvalidActionBonusSlots(
+  BonusSlotsState state,
+  BonusSlotsConfig config,
+  StreakState streakState,
+) {
+  if (!config.enabled) {
+    return _withOpenSlotsCount(state, 1);
+  }
+  if (config.closeOnInvalidAction) {
+    return _withOpenSlotsCount(
+      state,
+      _computeOpenSlotsCount(streakState, config),
+    );
+  }
+  return _withRecomputedOpenSlots(state, config, streakState);
+}
+
+BonusSlotsState _withOpenSlotsCount(BonusSlotsState state, int openSlotsCount) {
+  if (openSlotsCount >= state.openSlotsCount) {
+    return state.copyWith(openSlotsCount: openSlotsCount);
+  }
+  final merged = <List<Card>>[
+    List<Card>.from(state.slots[0]),
+    List<Card>.from(state.slots[1]),
+    List<Card>.from(state.slots[2]),
+  ];
+  final movedToSlot1Bottom = <Card>[];
+  for (var slot = openSlotsCount + 1; slot <= 3; slot++) {
+    final from = merged[slot - 1];
+    if (from.isEmpty) {
+      continue;
+    }
+    for (final card in from) {
+      if (!card.isJoker) {
+        movedToSlot1Bottom.add(card);
+      }
+    }
+    merged[slot - 1] = <Card>[];
+  }
+  if (movedToSlot1Bottom.isNotEmpty) {
+    merged[0] = <Card>[
+      ...movedToSlot1Bottom,
+      ...merged[0],
+    ];
+  }
+  return state.copyWith(
+    openSlotsCount: openSlotsCount,
+    slots: List<List<Card>>.unmodifiable(
+      merged.map((slot) => List<Card>.unmodifiable(slot)).toList(),
+    ),
+  );
+}
+
+List<List<Card>> _appendCardToSlot(
+  List<List<Card>> slots,
+  int slotIndex,
+  Card card,
+) {
+  final next = <List<Card>>[
+    List<Card>.from(slots[0]),
+    List<Card>.from(slots[1]),
+    List<Card>.from(slots[2]),
+  ];
+  next[slotIndex - 1].add(card);
+  return List<List<Card>>.unmodifiable(
+    next.map((slot) => List<Card>.unmodifiable(slot)).toList(),
+  );
+}
+
+List<List<Card>> _appendTableauCardToSlot(
+  List<List<Card>> slots,
+  int slotIndex,
+  Card card,
+  BonusSlotsConfig config,
+) {
+  var next = _appendCardToSlot(slots, slotIndex, card);
+  final slot = next[slotIndex - 1];
+  final previousTop = slot.length >= 2 ? slot[slot.length - 2] : null;
+  final shouldConsumePreviousTop = previousTop != null &&
+      ((previousTop.isJoker && config.jokerConsumedOnFirstUse) ||
+          previousTop.isAnchor);
+  if (slot.length >= 2 && shouldConsumePreviousTop) {
+    final mutable = <List<Card>>[
+      List<Card>.from(next[0]),
+      List<Card>.from(next[1]),
+      List<Card>.from(next[2]),
+    ];
+    mutable[slotIndex - 1].removeAt(mutable[slotIndex - 1].length - 2);
+    next = List<List<Card>>.unmodifiable(
+      mutable.map((s) => List<Card>.unmodifiable(s)).toList(),
+    );
+  }
+  return next;
+}
+
+Card _spawnOpenSlotAnchor(BonusSlotsConfig config, Rank? lastSuccessfulRank) {
+  switch (config.spawnPolicy) {
+    case BonusSlotSpawnPolicy.joker:
+      return const Card.joker();
+    case BonusSlotSpawnPolicy.tierFixedRank:
+      return Card.anchor(
+        _tierFixedAnchorRank(config, lastSuccessfulRank),
+      );
+  }
+}
+
+Rank _tierFixedAnchorRank(
+  BonusSlotsConfig config,
+  Rank? lastSuccessfulRank,
+) {
+  final tier = _tierForLastSuccessfulRank(
+    lastSuccessfulRank,
+    config.defaultAnchorTierWhenUnknown,
+  );
+  switch (tier) {
+    case BonusSlotAnchorTier.low:
+      return config.lowTierAnchorRank;
+    case BonusSlotAnchorTier.high:
+      return config.highTierAnchorRank;
+  }
+}
+
+BonusSlotAnchorTier _tierForLastSuccessfulRank(
+  Rank? lastSuccessfulRank,
+  BonusSlotAnchorTier whenUnknown,
+) {
+  final rank = lastSuccessfulRank;
+  if (rank == null) {
+    return whenUnknown;
+  }
+  if (rank.value >= 2 && rank.value <= 10) {
+    return BonusSlotAnchorTier.low;
+  }
+  return BonusSlotAnchorTier.high;
+}
+
+int _resolveTargetSlotForDraw(TriPeaksState state, int? targetSlot) {
+  // Draw actions always target slot 1.
+  return 1;
+}
+
+int _resolveTargetSlotForTableauMove(
+  TriPeaksState state,
+  int index,
+  int? targetSlot,
+) {
+  if (targetSlot case final explicit?) {
+    return explicit;
+  }
+  for (var slot = 1; slot <= state.bonusSlotsState.openSlotsCount; slot++) {
+    if (state.canRemoveTableau(index, targetSlot: slot)) {
+      return slot;
+    }
+  }
+  return 1;
+}
+
+int _computeOpenSlotsCount(
+  StreakState streakState,
+  BonusSlotsConfig config,
+) {
+  if (!config.enabled) {
+    return 1;
+  }
+
+  var open = 1;
+  if (streakState.currentStreak >= config.spawnOnOpenSlot2AtStreak) {
+    open = 2;
+  }
+  if (streakState.currentStreak >= config.spawnOnOpenSlot3AtStreak) {
+    open = 3;
+  }
+  if (open < 1) {
+    return 1;
+  }
+  if (open > config.maxSlots) {
+    return config.maxSlots;
+  }
+  return open;
 }
 
 StreakState _onSuccessfulDraw(StreakState streak, StreakConfig config) {
@@ -193,6 +576,29 @@ StreakState _onSuccessfulTableauMove(
     bestStreak: best,
     lastActionTick: tick,
   );
+}
+
+StrikeTimerState _onStreakAdvancedStrikeTimer(
+  StrikeTimerState state,
+  StrikeTimerConfig config,
+) {
+  if (!config.enabled) {
+    return state.copyWith(isArmed: false);
+  }
+  return state.copyWith(
+    isArmed: true,
+    deadlineToken: state.deadlineToken + 1,
+  );
+}
+
+StrikeTimerState _onStreakEndedStrikeTimer(
+  StrikeTimerState state,
+  StrikeTimerConfig config,
+) {
+  if (!config.enabled) {
+    return state.copyWith(isArmed: false);
+  }
+  return state.copyWith(isArmed: false);
 }
 
 /// Reduces a multi-round session by applying one [action].

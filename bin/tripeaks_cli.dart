@@ -12,6 +12,8 @@ void main(List<String> args) {
     roundRulesConfig: config.roundRulesConfig,
     undoConfig: config.undoConfig,
     streakConfig: config.streakConfig,
+    strikeTimerConfig: config.strikeTimerConfig,
+    bonusSlotsConfig: config.bonusSlotsConfig,
   );
   var matchScore = MatchScoreState(config: config.matchScoreConfig);
   var replay = TriPeaksReplay.newSession(
@@ -21,6 +23,8 @@ void main(List<String> args) {
     roundRulesConfig: session.roundRulesConfig,
     undoConfig: session.undoConfig,
     streakConfig: session.streakConfig,
+    strikeTimerConfig: session.strikeTimerConfig,
+    bonusSlotsConfig: session.bonusSlotsConfig,
   );
   var actionTick = 0;
 
@@ -28,6 +32,7 @@ void main(List<String> args) {
   stdout.writeln('Rounds per game: ${session.ruleset.roundsPerGame}');
   stdout.writeln('Type "help" for commands.');
   _printBoard(session);
+  String? lastCommand;
 
   while (true) {
     stdout.write('\n> ');
@@ -37,11 +42,22 @@ void main(List<String> args) {
       return;
     }
 
-    final tokens = input.trim().split(RegExp(r'\s+'));
+    var line = input.trim();
+    if (line.isEmpty) {
+      if (lastCommand == null) {
+        continue;
+      }
+      line = lastCommand;
+      stdout.writeln(line);
+    } else {
+      lastCommand = line;
+    }
+
+    final tokens = line.split(RegExp(r'\s+'));
     if (tokens.isEmpty || tokens.first.isEmpty) {
       continue;
     }
-    final command = tokens.first.toLowerCase();
+    final command = _normalizeCommand(tokens.first.toLowerCase());
 
     if (command == 'quit' || command == 'exit') {
       stdout.writeln('Exiting.');
@@ -98,15 +114,120 @@ void main(List<String> args) {
       continue;
     }
 
-    if (command == 'draw') {
+    if (command == 'fingerprint') {
       if (tokens.length != 1) {
-        stdout.writeln('Usage: draw');
+        stdout.writeln('Usage: fingerprint');
+        continue;
+      }
+      stdout.writeln('Round FP: ${stateFingerprint(session.currentRound)}');
+      stdout.writeln('Session FP: ${sessionFingerprint(session)}');
+      stdout.writeln('Replay FP: ${replayFingerprint(replay)}');
+      continue;
+    }
+
+    if (command == 'play') {
+      if (tokens.length != 1) {
+        stdout.writeln('Usage: play');
+        continue;
+      }
+      if (session.isCurrentRoundFinished) {
+        if (session.isSessionFinished) {
+          stdout.writeln('Session already finished.');
+          continue;
+        }
+        final recorded = recordAction(
+          replay,
+          session,
+          const StartNextRoundAction(),
+          tick: ++actionTick,
+        );
+        replay = recorded.replay;
+        session = _handleSessionResult(session, recorded.reduceResult);
+        continue;
+      }
+      final hint = getHint(
+        session.currentRound,
+        session.roundRulesConfig,
+        config.hintConfig,
+      );
+      final action = hint.isSuccess
+          ? PlayRoundAction(RemoveTableauCardAction(hint.moveIndex!))
+          : const PlayRoundAction(DrawFromStockAction());
+      final recorded = recordAction(
+        replay,
+        session,
+        action,
+        tick: ++actionTick,
+      );
+      replay = recorded.replay;
+      session = _handleSessionResult(session, recorded.reduceResult);
+      continue;
+    }
+
+    if (command == 'auto') {
+      if (tokens.length > 2) {
+        stdout.writeln('Usage: auto [steps]');
+        continue;
+      }
+      final steps = tokens.length == 2 ? int.tryParse(tokens[1]) : 10;
+      if (steps == null || steps < 1) {
+        stdout.writeln('Invalid steps. Usage: auto [steps]');
+        continue;
+      }
+      var current = session;
+      for (var i = 0; i < steps; i++) {
+        TriPeaksSessionAction action;
+        if (current.isSessionFinished) {
+          break;
+        }
+        if (current.isCurrentRoundFinished) {
+          action = const StartNextRoundAction();
+        } else {
+          final hint = getHint(
+            current.currentRound,
+            current.roundRulesConfig,
+            config.hintConfig,
+          );
+          if (hint.isSuccess) {
+            action = PlayRoundAction(RemoveTableauCardAction(hint.moveIndex!));
+          } else if (current.currentRound.canDrawFromStock) {
+            action = const PlayRoundAction(DrawFromStockAction());
+          } else {
+            break;
+          }
+        }
+        final recorded = recordAction(
+          replay,
+          current,
+          action,
+          tick: ++actionTick,
+        );
+        replay = recorded.replay;
+        current = _handleSessionResult(
+          current,
+          recorded.reduceResult,
+          printBoard: false,
+        );
+      }
+      session = current;
+      _printBoard(session);
+      continue;
+    }
+
+    if (command == 'draw') {
+      if (tokens.length > 2) {
+        stdout.writeln('Usage: draw [slot]');
+        continue;
+      }
+      final targetSlot = tokens.length == 2 ? int.tryParse(tokens[1]) : null;
+      if (tokens.length == 2 && targetSlot == null) {
+        stdout.writeln('Invalid slot. Usage: draw [slot]');
         continue;
       }
       final recorded = recordAction(
         replay,
         session,
-        const PlayRoundAction(DrawFromStockAction()),
+        PlayRoundAction(DrawFromStockAction(targetSlot: targetSlot)),
         tick: ++actionTick,
       );
       replay = recorded.replay;
@@ -126,6 +247,8 @@ void main(List<String> args) {
         roundRulesConfig: config.roundRulesConfig,
         undoConfig: config.undoConfig,
         streakConfig: config.streakConfig,
+        strikeTimerConfig: config.strikeTimerConfig,
+        bonusSlotsConfig: config.bonusSlotsConfig,
       );
       replay = TriPeaksReplay.newSession(
         seed: session.seed ?? TriPeaksSessionState.defaultSeed,
@@ -134,6 +257,8 @@ void main(List<String> args) {
         roundRulesConfig: session.roundRulesConfig,
         undoConfig: session.undoConfig,
         streakConfig: session.streakConfig,
+        strikeTimerConfig: session.strikeTimerConfig,
+        bonusSlotsConfig: session.bonusSlotsConfig,
       );
       actionTick = 0;
       stdout.writeln('Started a new game session.');
@@ -197,19 +322,49 @@ void main(List<String> args) {
     }
 
     if (command == 'take') {
-      if (tokens.length != 2) {
-        stdout.writeln('Usage: take <index>');
+      if (tokens.length < 2 || tokens.length > 3) {
+        stdout.writeln('Usage: take <index> [slot]');
         continue;
       }
       final index = int.tryParse(tokens[1]);
       if (index == null) {
-        stdout.writeln('Invalid index. Usage: take <index>');
+        stdout.writeln('Invalid index. Usage: take <index> [slot]');
+        continue;
+      }
+      final targetSlot = tokens.length == 3 ? int.tryParse(tokens[2]) : null;
+      if (tokens.length == 3 && targetSlot == null) {
+        stdout.writeln('Invalid slot. Usage: take <index> [slot]');
         continue;
       }
       final recorded = recordAction(
         replay,
         session,
-        PlayRoundAction(RemoveTableauCardAction(index)),
+        PlayRoundAction(
+          RemoveTableauCardAction(index, targetSlot: targetSlot),
+        ),
+        tick: ++actionTick,
+      );
+      replay = recorded.replay;
+      session = _handleSessionResult(session, recorded.reduceResult);
+      continue;
+    }
+
+    if (command == 'expire') {
+      if (tokens.length > 2) {
+        stdout.writeln('Usage: expire [deadlineToken]');
+        continue;
+      }
+      final token = tokens.length == 2
+          ? int.tryParse(tokens[1])
+          : session.currentRound.strikeTimerState.deadlineToken;
+      if (token == null) {
+        stdout.writeln('Invalid token. Usage: expire [deadlineToken]');
+        continue;
+      }
+      final recorded = recordAction(
+        replay,
+        session,
+        PlayRoundAction(StrikeTimerExpiredAction(deadlineToken: token)),
         tick: ++actionTick,
       );
       replay = recorded.replay;
@@ -390,20 +545,23 @@ void main(List<String> args) {
 
 TriPeaksSessionState _handleSessionResult(
   TriPeaksSessionState current,
-  TriPeaksSessionReduceResult result,
-) {
+  TriPeaksSessionReduceResult result, {
+  bool printBoard = true,
+}) {
   if (!result.isSuccess) {
     final message = result.sessionError?.message ?? result.roundError!.message;
     stdout.writeln('Invalid move: $message');
     final next = result.state;
-    if (!identical(next, current)) {
+    if (printBoard && !identical(next, current)) {
       _printBoard(next);
     }
     return next;
   }
 
   final next = result.state;
-  _printBoard(next);
+  if (printBoard) {
+    _printBoard(next);
+  }
 
   final roundJustCompleted = next.roundsCompleted > current.roundsCompleted;
   if (roundJustCompleted &&
@@ -451,12 +609,21 @@ void _printHelp() {
       .writeln('  moves                       Show removable tableau indices.');
   stdout.writeln(
       '  hint                        Show deterministic suggested move.');
+  stdout.writeln(
+      '  play                        Apply hint move, else draw, else next.');
+  stdout.writeln(
+      '  auto [steps]                Repeat `play` quickly (default 10).');
   stdout.writeln('  score                       Show round score state.');
-  stdout.writeln('  draw                        Draw one card from stock.');
+  stdout.writeln(
+      '  fingerprint                 Print deterministic round/session/replay hashes.');
+  stdout.writeln(
+      '  draw [slot]                 Draw one card to slot (default: 1).');
   stdout.writeln(
       '  undo                        Undo last successful round action.');
   stdout.writeln(
-      '  take <index>                Remove an exposed adjacent card.');
+      '  take <index> [slot]         Remove card to slot (default priority 1->3).');
+  stdout.writeln(
+      '  expire [token]              Apply StrikeTimerExpired (default=current token).');
   stdout.writeln(
       '  abort [reason]              Abort round: skip|quit|timeout|disconnect.');
   stdout.writeln(
@@ -475,6 +642,11 @@ void _printHelp() {
   stdout
       .writeln('  replay load <file>         Load replay and rebuild session.');
   stdout.writeln('  replay step <count>        Show state after N actions.');
+  stdout.writeln('Aliases:');
+  stdout.writeln('  ?:help, s:show, mv:moves, hn:hint, sc:score');
+  stdout.writeln('  d:draw, t:take, u:undo, n:next, a:abort, x:expire');
+  stdout.writeln('  rp:replay, mt:match, fp:fingerprint, q:quit');
+  stdout.writeln('  (empty line repeats last command)');
   stdout.writeln('Flags:');
   stdout.writeln('  --wrap-ace-king=true|false  Enable/disable A-K wrapping.');
   stdout.writeln('  --invalid-penalty=<int>     Penalty for invalid move.');
@@ -488,6 +660,25 @@ void _printHelp() {
       .writeln('  --streak-reset-on-invalid=... Reset streak on invalid move.');
   stdout.writeln(
       '  --streak-max-gap=<int>      Max tick gap before streak reset.');
+  stdout
+      .writeln('  --strike-enabled=true|false  Enable/disable strike expiry.');
+  stdout.writeln(
+      '  --strike-timeout=<int>       Strike timeout seconds metadata.');
+  stdout.writeln(
+      '  --bonus-spawn-policy=joker|tier-fixed-rank Spawn behavior for slot2/3.');
+  stdout.writeln(
+      '  --bonus-default-tier=low|high  Tier used before first tableau success.');
+  stdout.writeln(
+      '  --bonus-joker-any=true|false   Joker accepts any tableau rank.');
+  stdout.writeln(
+      '  --bonus-joker-consume=true|false Consume joker on first use.');
+  stdout
+      .writeln('  --bonus-slot2-streak=<int>  Streak threshold to open slot2.');
+  stdout
+      .writeln('  --bonus-slot3-streak=<int>  Streak threshold to open slot3.');
+  stdout.writeln('  --bonus-close-on-draw=true|false  Close slot2/3 on draw.');
+  stdout.writeln(
+      '  --bonus-close-on-invalid=true|false Close slot2/3 on invalid.');
   stdout.writeln('  quit                        Exit CLI.');
 }
 
@@ -562,6 +753,23 @@ void _printBoard(TriPeaksSessionState session) {
     'best=${state.streakState.bestStreak}, '
     'lastTick=${state.streakState.lastActionTick ?? '(none)'}',
   );
+  stdout.writeln(
+    'Strike timer: armed=${state.strikeTimerState.isArmed}, '
+    'token=${state.strikeTimerState.deadlineToken}, '
+    'timeout=${state.strikeTimerConfig.timeoutSeconds}s',
+  );
+  final openSlots = state.bonusSlotsState.openSlotsCount;
+  final slotTops = List<String>.generate(
+    state.bonusSlotsConfig.maxSlots,
+    (index) {
+      final slot = state.bonusSlotsState.slots[index];
+      final isOpen = index < openSlots;
+      final top = slot.isEmpty ? '--' : _cardLabel(slot.last);
+      return '${index + 1}:${isOpen ? 'open' : 'closed'}($top)';
+    },
+    growable: false,
+  );
+  stdout.writeln('Bonus slots: ${slotTops.join('  ')}');
   stdout.writeln('Waste top: ${_cardLabel(state.wasteTop)}');
   stdout.writeln('Stock: ${state.stockCount}');
   stdout.writeln(
@@ -600,7 +808,15 @@ String _cell(TriPeaksState state, int index) {
   return _cardLabel(state.tableau[index]);
 }
 
-String _cardLabel(Card card) => '${card.rank.label}${_suitSymbol(card.suit)}';
+String _cardLabel(Card card) {
+  if (card.isJoker) {
+    return 'JK';
+  }
+  if (card.isAnchor) {
+    return '${card.rank.label}*';
+  }
+  return '${card.rank.label}${_suitSymbol(card.suit)}';
+}
 
 String _suitSymbol(Suit suit) {
   switch (suit) {
@@ -633,6 +849,43 @@ AbortReason? _parseAbortReason(String? value) {
   }
 }
 
+String _normalizeCommand(String command) {
+  switch (command) {
+    case '?':
+      return 'help';
+    case 'q':
+      return 'quit';
+    case 's':
+      return 'show';
+    case 'mv':
+      return 'moves';
+    case 'hn':
+      return 'hint';
+    case 'sc':
+      return 'score';
+    case 'd':
+      return 'draw';
+    case 't':
+      return 'take';
+    case 'u':
+      return 'undo';
+    case 'n':
+      return 'next';
+    case 'a':
+      return 'abort';
+    case 'x':
+      return 'expire';
+    case 'rp':
+      return 'replay';
+    case 'mt':
+      return 'match';
+    case 'fp':
+      return 'fingerprint';
+    default:
+      return command;
+  }
+}
+
 final class _CliConfig {
   const _CliConfig({
     required this.ruleset,
@@ -641,6 +894,8 @@ final class _CliConfig {
     required this.undoConfig,
     required this.hintConfig,
     required this.streakConfig,
+    required this.strikeTimerConfig,
+    required this.bonusSlotsConfig,
     required this.matchScoreConfig,
     this.seed,
   });
@@ -651,6 +906,8 @@ final class _CliConfig {
   final UndoConfig undoConfig;
   final HintConfig hintConfig;
   final StreakConfig streakConfig;
+  final StrikeTimerConfig strikeTimerConfig;
+  final BonusSlotsConfig bonusSlotsConfig;
   final MatchScoreConfig matchScoreConfig;
   final int? seed;
 }
@@ -659,14 +916,24 @@ _CliConfig _parseArgs(List<String> args) {
   TriPeaksRuleset ruleset = TriPeaksRuleset.threeRounds;
   int? seed;
   int invalidPenalty = 0;
-  bool aceKingWrapAround = false;
+  bool aceKingWrapAround = true;
   bool undoEnabled = true;
   int undoMaxSteps = 10;
   bool hintsEnabled = true;
   bool streakEnabled = true;
   bool streakResetOnDraw = true;
-  bool streakResetOnInvalid = false;
+  bool streakResetOnInvalid = true;
   int? streakMaxGap;
+  bool strikeEnabled = true;
+  int strikeTimeoutSeconds = 10;
+  BonusSlotSpawnPolicy bonusSpawnPolicy = BonusSlotSpawnPolicy.tierFixedRank;
+  BonusSlotAnchorTier bonusDefaultAnchorTier = BonusSlotAnchorTier.low;
+  bool bonusJokerAny = true;
+  bool bonusJokerConsume = true;
+  int bonusSlot2Streak = 3;
+  int bonusSlot3Streak = 6;
+  bool bonusCloseOnDraw = true;
+  bool bonusCloseOnInvalid = true;
   int firstFinishBonus = 0;
   Map<int, int> rankingAdjustments = const <int, int>{};
 
@@ -734,6 +1001,79 @@ _CliConfig _parseArgs(List<String> args) {
       streakMaxGap = int.tryParse(arg.substring('--streak-max-gap='.length));
       continue;
     }
+    if (arg.startsWith('--strike-enabled=')) {
+      final value = arg.substring('--strike-enabled='.length).toLowerCase();
+      strikeEnabled = value == 'true' || value == '1' || value == 'yes';
+      continue;
+    }
+    if (arg.startsWith('--strike-timeout=')) {
+      strikeTimeoutSeconds =
+          int.tryParse(arg.substring('--strike-timeout='.length)) ??
+              strikeTimeoutSeconds;
+      if (strikeTimeoutSeconds <= 0) {
+        strikeTimeoutSeconds = 10;
+      }
+      continue;
+    }
+    if (arg.startsWith('--bonus-joker-any=')) {
+      final value = arg.substring('--bonus-joker-any='.length).toLowerCase();
+      bonusJokerAny = value == 'true' || value == '1' || value == 'yes';
+      continue;
+    }
+    if (arg.startsWith('--bonus-spawn-policy=')) {
+      final value = arg.substring('--bonus-spawn-policy='.length).toLowerCase();
+      if (value == 'joker') {
+        bonusSpawnPolicy = BonusSlotSpawnPolicy.joker;
+      } else if (value == 'tier-fixed-rank') {
+        bonusSpawnPolicy = BonusSlotSpawnPolicy.tierFixedRank;
+      }
+      continue;
+    }
+    if (arg.startsWith('--bonus-default-tier=')) {
+      final value = arg.substring('--bonus-default-tier='.length).toLowerCase();
+      if (value == 'low') {
+        bonusDefaultAnchorTier = BonusSlotAnchorTier.low;
+      } else if (value == 'high') {
+        bonusDefaultAnchorTier = BonusSlotAnchorTier.high;
+      }
+      continue;
+    }
+    if (arg.startsWith('--bonus-joker-consume=')) {
+      final value =
+          arg.substring('--bonus-joker-consume='.length).toLowerCase();
+      bonusJokerConsume = value == 'true' || value == '1' || value == 'yes';
+      continue;
+    }
+    if (arg.startsWith('--bonus-slot2-streak=')) {
+      bonusSlot2Streak =
+          int.tryParse(arg.substring('--bonus-slot2-streak='.length)) ??
+              bonusSlot2Streak;
+      if (bonusSlot2Streak < 1) {
+        bonusSlot2Streak = 1;
+      }
+      continue;
+    }
+    if (arg.startsWith('--bonus-slot3-streak=')) {
+      bonusSlot3Streak =
+          int.tryParse(arg.substring('--bonus-slot3-streak='.length)) ??
+              bonusSlot3Streak;
+      if (bonusSlot3Streak < 1) {
+        bonusSlot3Streak = 1;
+      }
+      continue;
+    }
+    if (arg.startsWith('--bonus-close-on-draw=')) {
+      final value =
+          arg.substring('--bonus-close-on-draw='.length).toLowerCase();
+      bonusCloseOnDraw = value == 'true' || value == '1' || value == 'yes';
+      continue;
+    }
+    if (arg.startsWith('--bonus-close-on-invalid=')) {
+      final value =
+          arg.substring('--bonus-close-on-invalid='.length).toLowerCase();
+      bonusCloseOnInvalid = value == 'true' || value == '1' || value == 'yes';
+      continue;
+    }
     if (arg.startsWith('--rank-adjustments=')) {
       rankingAdjustments = _parseRankingAdjustments(
         arg.substring('--rank-adjustments='.length),
@@ -760,6 +1100,20 @@ _CliConfig _parseArgs(List<String> args) {
       resetOnDraw: streakResetOnDraw,
       resetOnInvalidAction: streakResetOnInvalid,
       maxGapTicks: streakMaxGap,
+    ),
+    strikeTimerConfig: StrikeTimerConfig(
+      enabled: strikeEnabled,
+      timeoutSeconds: strikeTimeoutSeconds,
+    ),
+    bonusSlotsConfig: BonusSlotsConfig(
+      spawnPolicy: bonusSpawnPolicy,
+      defaultAnchorTierWhenUnknown: bonusDefaultAnchorTier,
+      jokerAcceptsAnyRank: bonusJokerAny,
+      jokerConsumedOnFirstUse: bonusJokerConsume,
+      spawnOnOpenSlot2AtStreak: bonusSlot2Streak,
+      spawnOnOpenSlot3AtStreak: bonusSlot3Streak,
+      closeOnDraw: bonusCloseOnDraw,
+      closeOnInvalidAction: bonusCloseOnInvalid,
     ),
     matchScoreConfig: MatchScoreConfig(
       firstFinishBonus: firstFinishBonus,

@@ -16,6 +16,8 @@ final class TriPeaksSessionState {
     RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
     UndoConfig undoConfig = const UndoConfig(),
     StreakConfig streakConfig = const StreakConfig(),
+    StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
+    BonusSlotsConfig bonusSlotsConfig = const BonusSlotsConfig(),
   }) {
     if (roundDecks != null && roundDecks.length != ruleset.roundsPerGame) {
       throw ArgumentError.value(
@@ -40,6 +42,8 @@ final class TriPeaksSessionState {
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
+      strikeTimerConfig: strikeTimerConfig,
+      bonusSlotsConfig: bonusSlotsConfig,
     );
 
     return TriPeaksSessionState._(
@@ -50,6 +54,8 @@ final class TriPeaksSessionState {
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
+      strikeTimerConfig: strikeTimerConfig,
+      bonusSlotsConfig: bonusSlotsConfig,
       currentRoundNumber: 1,
       roundsCompleted: 0,
       roundsWon: 0,
@@ -68,6 +74,8 @@ final class TriPeaksSessionState {
     required this.roundRulesConfig,
     required this.undoConfig,
     required this.streakConfig,
+    required this.strikeTimerConfig,
+    required this.bonusSlotsConfig,
     required this.currentRoundNumber,
     required this.roundsCompleted,
     required this.roundsWon,
@@ -86,6 +94,8 @@ final class TriPeaksSessionState {
   final RoundRulesConfig roundRulesConfig;
   final UndoConfig undoConfig;
   final StreakConfig streakConfig;
+  final StrikeTimerConfig strikeTimerConfig;
+  final BonusSlotsConfig bonusSlotsConfig;
 
   /// Current 1-based round number.
   final int currentRoundNumber;
@@ -136,6 +146,8 @@ final class TriPeaksSessionState {
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
+      strikeTimerConfig: strikeTimerConfig,
+      bonusSlotsConfig: bonusSlotsConfig,
       currentRoundNumber: currentRoundNumber ?? this.currentRoundNumber,
       roundsCompleted: roundsCompleted ?? this.roundsCompleted,
       roundsWon: roundsWon ?? this.roundsWon,
@@ -156,6 +168,8 @@ final class TriPeaksSessionState {
     required RoundRulesConfig roundRulesConfig,
     required UndoConfig undoConfig,
     required StreakConfig streakConfig,
+    required StrikeTimerConfig strikeTimerConfig,
+    required BonusSlotsConfig bonusSlotsConfig,
   }) {
     if (roundDecks case final decks?) {
       return TriPeaksState.newGame(
@@ -164,6 +178,8 @@ final class TriPeaksSessionState {
         roundRulesConfig: roundRulesConfig,
         undoConfig: undoConfig,
         streakConfig: streakConfig,
+        strikeTimerConfig: strikeTimerConfig,
+        bonusSlotsConfig: bonusSlotsConfig,
       );
     }
 
@@ -174,6 +190,8 @@ final class TriPeaksSessionState {
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
+      strikeTimerConfig: strikeTimerConfig,
+      bonusSlotsConfig: bonusSlotsConfig,
     );
   }
 
@@ -195,6 +213,8 @@ final class TriPeaksSessionState {
       'roundRulesConfig': roundRulesConfig.toMap(),
       'undoConfig': undoConfig.toMap(),
       'streakConfig': streakConfig.toMap(),
+      'strikeTimerConfig': strikeTimerConfig.toMap(),
+      'bonusSlotsConfig': bonusSlotsConfig.toMap(),
       'currentRoundNumber': currentRoundNumber,
       'roundsCompleted': roundsCompleted,
       'roundsWon': roundsWon,
@@ -292,6 +312,35 @@ final class TriPeaksSessionState {
     final streakConfigResult = StreakConfig.tryFromMap(streakConfigMap);
     if (!streakConfigResult.isSuccess) {
       return DecodeResult.failure(streakConfigResult.error!);
+    }
+    final strikeTimerConfigMap = map['strikeTimerConfig'];
+    if (strikeTimerConfigMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'strikeTimerConfig must be a map.',
+        ),
+      );
+    }
+    final strikeTimerConfigResult = StrikeTimerConfig.tryFromMap(
+      strikeTimerConfigMap,
+    );
+    if (!strikeTimerConfigResult.isSuccess) {
+      return DecodeResult.failure(strikeTimerConfigResult.error!);
+    }
+    final bonusSlotsConfigMap = map['bonusSlotsConfig'];
+    if (bonusSlotsConfigMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'bonusSlotsConfig must be a map.',
+        ),
+      );
+    }
+    final bonusSlotsConfigResult =
+        BonusSlotsConfig.tryFromMap(bonusSlotsConfigMap);
+    if (!bonusSlotsConfigResult.isSuccess) {
+      return DecodeResult.failure(bonusSlotsConfigResult.error!);
     }
     final currentRoundMap = map['currentRound'];
     if (currentRoundMap is! Map<String, dynamic>) {
@@ -395,6 +444,8 @@ final class TriPeaksSessionState {
         roundRulesConfig: roundRulesResult.value!,
         undoConfig: undoConfigResult.value!,
         streakConfig: streakConfigResult.value!,
+        strikeTimerConfig: strikeTimerConfigResult.value!,
+        bonusSlotsConfig: bonusSlotsConfigResult.value!,
         currentRoundNumber: currentRoundNumber,
         roundsCompleted: roundsCompleted,
         roundsWon: roundsWon,
