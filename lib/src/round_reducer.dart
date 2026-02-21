@@ -56,10 +56,13 @@ TriPeaksReduceResult tryReduceTriPeaks(
       return TriPeaksReduceResult(
         state: preprocessed,
         scoreDelta: 0,
+        scoreBreakdown: preprocessed.scoreState.lastBreakdown,
+        appliedMultiplier: preprocessed.scoreState.currentMultiplier,
         error: error,
       );
     }
     final penalty = preprocessed.scoreConfig.penaltyInvalidAction;
+    final breakdown = _buildInvalidPenaltyBreakdown(penalty);
     var nextStreakState = preprocessed.streakState;
     var nextStrikeTimerState = preprocessed.strikeTimerState;
     if (preprocessed.streakConfig.enabled &&
@@ -77,12 +80,18 @@ TriPeaksReduceResult tryReduceTriPeaks(
     );
     return TriPeaksReduceResult(
       state: preprocessed._copyWith(
-        scoreState: preprocessed.scoreState.applyDelta(penalty),
+        scoreState: preprocessed.scoreState.applyDelta(
+          penalty,
+          appliedMultiplier: 1,
+          breakdown: breakdown,
+        ),
         streakState: nextStreakState,
         strikeTimerState: nextStrikeTimerState,
         bonusSlotsState: nextBonusSlotsState,
       ),
       scoreDelta: penalty,
+      scoreBreakdown: breakdown,
+      appliedMultiplier: 1,
       error: error,
     );
   }
@@ -95,10 +104,17 @@ TriPeaksReduceResult tryReduceTriPeaks(
   return TriPeaksReduceResult(
     state: applied.state,
     scoreDelta: applied.scoreDelta,
+    scoreBreakdown: applied.scoreBreakdown,
+    appliedMultiplier: applied.appliedMultiplier,
   );
 }
 
-({TriPeaksState state, int scoreDelta}) _applyAction(
+({
+  TriPeaksState state,
+  int scoreDelta,
+  ScoreDeltaBreakdown scoreBreakdown,
+  int appliedMultiplier,
+}) _applyAction(
   TriPeaksState state,
   TriPeaksAction action, {
   required int effectiveTick,
@@ -106,6 +122,7 @@ TriPeaksReduceResult tryReduceTriPeaks(
   switch (action) {
     case DrawFromStockAction(targetSlot: final targetSlot):
       final delta = state.scoreConfig.pointsDrawFromStock;
+      final breakdown = _buildDrawBreakdown(delta);
       final nextHistory = _pushUndoSnapshot(state);
       final nextStreak = _onSuccessfulDraw(
         state.streakState,
@@ -130,13 +147,19 @@ TriPeaksReduceResult tryReduceTriPeaks(
       return (
         state: state._copyWith(
           stock: state.stock.skip(1).toList(growable: false),
-          scoreState: state.scoreState.applyDelta(delta),
+          scoreState: state.scoreState.applyDelta(
+            delta,
+            appliedMultiplier: 1,
+            breakdown: breakdown,
+          ),
           streakState: nextStreak,
           strikeTimerState: nextStrikeTimer,
           bonusSlotsState: nextBonusSlotsState,
           undoHistory: nextHistory,
         ),
         scoreDelta: delta,
+        scoreBreakdown: breakdown,
+        appliedMultiplier: 1,
       );
 
     case RemoveTableauCardAction(
@@ -150,8 +173,25 @@ TriPeaksReduceResult tryReduceTriPeaks(
         nextRemoved,
         state.clearedPeaksAwardedMask,
       );
-      final delta = state.scoreConfig.pointsTableauToWaste +
-          (state.scoreConfig.pointsPeakCleared * peakBonus.newlyClearedCount);
+      final preStreak = state.streakState.currentStreak;
+      final appliedMultiplier = _computeAppliedMultiplier(
+        preStreak,
+        state.scoreConfig,
+      );
+      final tableauBasePoints = state.scoreConfig.pointsTableauToWaste;
+      final multiplierExtraPoints = tableauBasePoints * (appliedMultiplier - 1);
+      final peakBonusPoints =
+          state.scoreConfig.pointsPeakCleared * peakBonus.newlyClearedCount;
+      final delta = tableauBasePoints + multiplierExtraPoints + peakBonusPoints;
+      final breakdown = ScoreDeltaBreakdown(
+        tableauBasePoints: tableauBasePoints,
+        multiplierExtraPoints: multiplierExtraPoints,
+        peakBonusPoints: peakBonusPoints,
+        drawPoints: 0,
+        invalidPenaltyPoints: 0,
+        appliedMultiplier: appliedMultiplier,
+        totalDelta: delta,
+      );
       final nextStreak = _onSuccessfulTableauMove(
         state.streakState,
         state.streakConfig,
@@ -181,7 +221,11 @@ TriPeaksReduceResult tryReduceTriPeaks(
       return (
         state: state._copyWith(
           removed: nextRemoved,
-          scoreState: state.scoreState.applyDelta(delta),
+          scoreState: state.scoreState.applyDelta(
+            delta,
+            appliedMultiplier: appliedMultiplier,
+            breakdown: breakdown,
+          ),
           streakState: nextStreak,
           strikeTimerState: nextStrikeTimer,
           bonusSlotsState: nextBonusSlotsState,
@@ -190,6 +234,8 @@ TriPeaksReduceResult tryReduceTriPeaks(
           undoHistory: nextHistory,
         ),
         scoreDelta: delta,
+        scoreBreakdown: breakdown,
+        appliedMultiplier: appliedMultiplier,
       );
 
     case UseBonusSlotAction(slotIndex: final slotIndex):
@@ -197,12 +243,19 @@ TriPeaksReduceResult tryReduceTriPeaks(
       final nextBonusSlotsState = state.bonusSlotsState.copyWith(
         lastUsedSlot: slotIndex,
       );
+      const breakdown = ScoreDeltaBreakdown.zero;
       return (
         state: state._copyWith(
+          scoreState: state.scoreState.withNoScoreChange(
+            appliedMultiplier: 1,
+            breakdown: breakdown,
+          ),
           bonusSlotsState: nextBonusSlotsState,
           undoHistory: nextHistory,
         ),
         scoreDelta: 0,
+        scoreBreakdown: breakdown,
+        appliedMultiplier: 1,
       );
 
     case StrikeTimerExpiredAction():
@@ -213,14 +266,21 @@ TriPeaksReduceResult tryReduceTriPeaks(
         state.strikeTimerConfig,
       );
       final nextBonusSlotsState = _withOpenSlotsCount(state.bonusSlotsState, 1);
+      const breakdown = ScoreDeltaBreakdown.zero;
       return (
         state: state._copyWith(
+          scoreState: state.scoreState.withNoScoreChange(
+            appliedMultiplier: 1,
+            breakdown: breakdown,
+          ),
           streakState: endedStreak,
           strikeTimerState: nextStrikeTimer,
           bonusSlotsState: nextBonusSlotsState,
           undoHistory: nextHistory,
         ),
         scoreDelta: 0,
+        scoreBreakdown: breakdown,
+        appliedMultiplier: 1,
       );
 
     case UndoAction():
@@ -232,8 +292,43 @@ TriPeaksReduceResult tryReduceTriPeaks(
       return (
         state: restored._copyWith(undoHistory: remaining),
         scoreDelta: 0,
+        scoreBreakdown: restored.scoreState.lastBreakdown,
+        appliedMultiplier: restored.scoreState.currentMultiplier,
       );
   }
+}
+
+int _computeAppliedMultiplier(int currentStreak, ScoreConfig config) {
+  final normalizedMax = config.multiplierMax < 1 ? 1 : config.multiplierMax;
+  final normalizedStep = config.streakStepSize < 1 ? 1 : config.streakStepSize;
+  final steps = currentStreak <= 0 ? 0 : (currentStreak ~/ normalizedStep);
+  final raw = 1 + (steps * config.multiplierStepIncrement);
+  final capped = min(raw, normalizedMax);
+  return capped < 1 ? 1 : capped;
+}
+
+ScoreDeltaBreakdown _buildDrawBreakdown(int drawPoints) {
+  return ScoreDeltaBreakdown(
+    tableauBasePoints: 0,
+    multiplierExtraPoints: 0,
+    peakBonusPoints: 0,
+    drawPoints: drawPoints,
+    invalidPenaltyPoints: 0,
+    appliedMultiplier: 1,
+    totalDelta: drawPoints,
+  );
+}
+
+ScoreDeltaBreakdown _buildInvalidPenaltyBreakdown(int penalty) {
+  return ScoreDeltaBreakdown(
+    tableauBasePoints: 0,
+    multiplierExtraPoints: 0,
+    peakBonusPoints: 0,
+    drawPoints: 0,
+    invalidPenaltyPoints: penalty,
+    appliedMultiplier: 1,
+    totalDelta: penalty,
+  );
 }
 
 ({int newlyClearedCount, int nextAwardedMask}) _computePeakClearBonus(

@@ -1,5 +1,13 @@
 part of '../tripeaks_engine.dart';
 
+/// Compact derived status helper for common session UX.
+enum TriPeaksSessionStatus {
+  inProgress,
+  won,
+  lost,
+  gameOver,
+}
+
 /// Immutable multi-round TriPeaks session state snapshot.
 ///
 /// This wraps one active round plus completed round history and aggregate
@@ -130,6 +138,20 @@ final class TriPeaksSessionState {
 
   /// Whether all rounds in the session have been completed.
   bool get isSessionFinished => roundsCompleted >= ruleset.roundsPerGame;
+
+  /// Derived deterministic status for UI/integration helpers.
+  TriPeaksSessionStatus get status {
+    if (isSessionFinished) {
+      return TriPeaksSessionStatus.gameOver;
+    }
+    if (currentRound.isWon) {
+      return TriPeaksSessionStatus.won;
+    }
+    if (currentRound.isLost) {
+      return TriPeaksSessionStatus.lost;
+    }
+    return TriPeaksSessionStatus.inProgress;
+  }
 
   bool get _hasNextRound => currentRoundNumber < ruleset.roundsPerGame;
 
