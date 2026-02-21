@@ -1,5 +1,6 @@
 part of '../tripeaks_engine.dart';
 
+/// Reduces [state] by [event], throwing when the event is invalid.
 MatchScoreState reduceMatchScore(
   MatchScoreState state,
   MatchScoreEvent event,

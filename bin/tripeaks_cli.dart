@@ -125,6 +125,15 @@ void main(List<String> args) {
       continue;
     }
 
+    if (command == 'verify') {
+      if (tokens.length != 1) {
+        stdout.writeln('Usage: verify');
+        continue;
+      }
+      _printDeterminismVerification(session, replay);
+      continue;
+    }
+
     if (command == 'play') {
       if (tokens.length != 1) {
         stdout.writeln('Usage: play');
@@ -388,11 +397,13 @@ void main(List<String> args) {
           break;
 
         case 'save':
-          if (tokens.length != 3) {
-            stdout.writeln('Usage: replay save <file>');
+          if (tokens.length < 2 || tokens.length > 3) {
+            stdout.writeln('Usage: replay save [file]');
             break;
           }
-          final file = File(tokens[2]);
+          final filePath =
+              tokens.length == 3 ? tokens[2] : _defaultReplayFileName(replay);
+          final file = File(filePath);
           file.writeAsStringSync(
             const JsonEncoder.withIndent('  ').convert(replay.toMap()),
           );
@@ -617,6 +628,8 @@ void _printHelp() {
   stdout.writeln(
       '  fingerprint                 Print deterministic round/session/replay hashes.');
   stdout.writeln(
+      '  verify                      Check session/replay fingerprint equality.');
+  stdout.writeln(
       '  draw [slot]                 Draw one card to slot (default: 1).');
   stdout.writeln(
       '  undo                        Undo last successful round action.');
@@ -638,14 +651,14 @@ void _printHelp() {
       .writeln('  match rank <id> <rank>      Apply ranking adjustment event.');
   stdout.writeln('  match reset                 Reset match scoring.');
   stdout.writeln('  replay show                Show replay metadata.');
-  stdout.writeln('  replay save <file>         Save replay as JSON.');
+  stdout.writeln('  replay save [file]         Save replay as JSON.');
   stdout
       .writeln('  replay load <file>         Load replay and rebuild session.');
   stdout.writeln('  replay step <count>        Show state after N actions.');
   stdout.writeln('Aliases:');
   stdout.writeln('  ?:help, s:show, mv:moves, hn:hint, sc:score');
   stdout.writeln('  d:draw, t:take, u:undo, n:next, a:abort, x:expire');
-  stdout.writeln('  rp:replay, mt:match, fp:fingerprint, q:quit');
+  stdout.writeln('  rp:replay, mt:match, fp:fingerprint, v:verify, q:quit');
   stdout.writeln('  (empty line repeats last command)');
   stdout.writeln('Flags:');
   stdout.writeln('  --wrap-ace-king=true|false  Enable/disable A-K wrapping.');
@@ -731,6 +744,29 @@ void _printReplay(TriPeaksReplay replay) {
       'tick=${entry.tick} $status',
     );
   }
+}
+
+void _printDeterminismVerification(
+  TriPeaksSessionState session,
+  TriPeaksReplay replay,
+) {
+  final sessionFp = sessionFingerprint(session);
+  final replayFp = replayFingerprint(replay);
+  final ok = sessionFp == replayFp;
+  stdout.writeln('Verify: ${ok ? 'OK' : 'FAIL'}');
+  stdout.writeln('  Session FP: $sessionFp');
+  stdout.writeln('  Replay FP:  $replayFp');
+}
+
+String _defaultReplayFileName(TriPeaksReplay replay) {
+  final now = DateTime.now().toUtc();
+  final stamp = '${now.year.toString().padLeft(4, '0')}'
+      '${now.month.toString().padLeft(2, '0')}'
+      '${now.day.toString().padLeft(2, '0')}_'
+      '${now.hour.toString().padLeft(2, '0')}'
+      '${now.minute.toString().padLeft(2, '0')}'
+      '${now.second.toString().padLeft(2, '0')}';
+  return 'replay_${replay.seed}_$stamp.json';
 }
 
 void _printBoard(TriPeaksSessionState session) {
@@ -881,6 +917,8 @@ String _normalizeCommand(String command) {
       return 'match';
     case 'fp':
       return 'fingerprint';
+    case 'v':
+      return 'verify';
     default:
       return command;
   }

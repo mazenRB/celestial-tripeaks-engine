@@ -1,5 +1,9 @@
 part of '../tripeaks_engine.dart';
 
+/// Lightweight mutable wrapper around the pure session reducer.
+///
+/// This is convenient for app shells and quick prototypes while still keeping
+/// deterministic core logic in immutable state reducers.
 final class TriPeaksGame {
   /// Creates a new game session with [ruleset].
   ///

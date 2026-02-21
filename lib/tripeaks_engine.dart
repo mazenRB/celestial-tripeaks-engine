@@ -1,3 +1,9 @@
+/// Deterministic pure Dart TriPeaks engine library.
+///
+/// This library exposes round/session reducers, configuration DTOs,
+/// replay/save/fingerprint utilities, and multiplayer orchestration types.
+library;
+
 import 'dart:convert';
 import 'dart:math';
 

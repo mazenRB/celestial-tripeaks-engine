@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "type": "replay_session",
+  "engineVersion": 1,
+  "seed": 0,
+  "ruleset": {
+    "schemaVersion": 1,
+    "type": "tripeaks_ruleset",
+    "roundsPerGame": 3
+  },
+  "scoreConfig": {
+    "schemaVersion": 1,
+    "type": "score_config",
+    "pointsTableauToWaste": 5,
+    "pointsDrawFromStock": 0,
+    "penaltyInvalidAction": 0,
+    "pointsPeakCleared": 0
+  },
+  "roundRulesConfig": {
+    "schemaVersion": 1,
+    "type": "round_rules_config",
+    "aceKingWrapAround": true
+  },
+  "undoConfig": {
+    "schemaVersion": 1,
+    "type": "undo_config",
+    "enabled": true,
+    "maxSteps": 10
+  },
+  "streakConfig": {
+    "schemaVersion": 1,
+    "type": "streak_config",
+    "enabled": true,
+    "resetOnDraw": true,
+    "resetOnInvalidAction": true
+  },
+  "strikeTimerConfig": {
+    "schemaVersion": 1,
+    "type": "strike_timer_config",
+    "enabled": true,
+    "timeoutSeconds": 10
+  },
+  "bonusSlotsConfig": {
+    "schemaVersion": 1,
+    "type": "bonus_slots_config",
+    "enabled": true,
+    "spawnPolicy": "tierFixedRank",
+    "defaultAnchorTierWhenUnknown": "low",
+    "lowTierAnchorRank": "six",
+    "highTierAnchorRank": "queen",
+    "jokerAcceptsAnyRank": true,
+    "jokerConsumedOnFirstUse": true,
+    "spawnOnOpenSlot2AtStreak": 3,
+    "spawnOnOpenSlot3AtStreak": 6,
+    "closeOnDraw": true,
+    "closeOnInvalidAction": true,
+    "maxSlots": 3
+  },
+  "entries": [
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 1,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 23
+      },
+      "accepted": true,
+      "tick": 1
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 2,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 20
+      },
+      "accepted": true,
+      "tick": 2
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 3,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "drawFromStock"
+      },
+      "accepted": true,
+      "tick": 3
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 4,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 22
+      },
+      "accepted": true,
+      "tick": 4
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 5,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 18
+      },
+      "accepted": true,
+      "tick": 5
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 6,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 27
+      },
+      "accepted": true,
+      "tick": 6
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 7,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 24
+      },
+      "accepted": true,
+      "tick": 7
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 8,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 13
+      },
+      "accepted": true,
+      "tick": 8
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 9,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 25
+      },
+      "accepted": true,
+      "tick": 9
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 10,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 14
+      },
+      "accepted": true,
+      "tick": 10
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 11,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 26
+      },
+      "accepted": true,
+      "tick": 11
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 12,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 17
+      },
+      "accepted": true,
+      "tick": 12
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 13,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "drawFromStock"
+      },
+      "accepted": true,
+      "tick": 13
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 14,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "drawFromStock"
+      },
+      "accepted": true,
+      "tick": 14
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 15,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "drawFromStock"
+      },
+      "accepted": true,
+      "tick": 15
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 16,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 15
+      },
+      "accepted": true,
+      "tick": 16
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 17,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 6
+      },
+      "accepted": true,
+      "tick": 17
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 18,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 16
+      },
+      "accepted": true,
+      "tick": 18
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 19,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "removeTableauCard",
+        "tableauIndex": 21
+      },
+      "accepted": true,
+      "tick": 19
+    },
+    {
+      "schemaVersion": 1,
+      "type": "replay_entry",
+      "sequence": 20,
+      "action": {
+        "schemaVersion": 1,
+        "type": "replay_action",
+        "kind": "drawFromStock"
+      },
+      "accepted": true,
+      "tick": 20
+    }
+  ]
+}
