@@ -15,11 +15,47 @@ Defaults:
 - `pointsDrawFromStock = 0`
 - `penaltyInvalidAction = 0`
 - `pointsPeakCleared = 0`
+- `streakStepSize = 999999`
+- `multiplierStepIncrement = 0`
+- `multiplierMax = 1`
+
+Multiplier formula for successful tableau removals:
+
+- `steps = (currentStreak <= 0) ? 0 : (currentStreak ~/ streakStepSize)`
+- `multiplier = min(1 + steps * multiplierStepIncrement, multiplierMax)`
+- `appliedMultiplier = max(1, multiplier)`
+
+In PR1, multiplier applies only to tableau base points. Draw points and peak
+bonus points are not multiplied.
 
 Risk notes:
 
 - Large positive draw scoring can reduce strategic pressure.
 - Large negative invalid penalty can make recoverability harsh.
+
+### `ScoreDeltaBreakdown`
+
+Accepted actions expose score components through `ScoreDeltaBreakdown`:
+
+- `tableauBasePoints`
+- `multiplierExtraPoints`
+- `peakBonusPoints`
+- `drawPoints`
+- `invalidPenaltyPoints`
+- `appliedMultiplier`
+- `totalDelta`
+
+Invariant:
+
+- `totalDelta == tableauBasePoints + multiplierExtraPoints + peakBonusPoints + drawPoints + invalidPenaltyPoints`
+
+Example:
+
+```dart
+final breakdown = state.scoreState.lastBreakdown;
+print('delta=${breakdown.totalDelta}');
+print('multiplier=${state.scoreState.currentMultiplier}');
+```
 
 ### `RoundRulesConfig`
 
