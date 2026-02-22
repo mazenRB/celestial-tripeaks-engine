@@ -12,3 +12,23 @@
 - Every change must ship with unit tests and deterministic fixtures.
 - All numeric game tuning values (score, penalties, bonuses, limits) must be configurable via injected policy/config objects and never hardcoded inside core mechanics.
 - All public state and action types must be versioned and serializable, even if not yet used over network.
+
+# Branch & PR Workflow (required)
+- Never continue feature work on a branch that is intended for an open/unmerged PR unless the new work is explicitly part of that same PR scope.
+- Before starting any new task, run and verify:
+  - `git branch --show-current`
+  - `git status --short`
+  - `git rev-list --left-right --count main...HEAD`
+- If current branch has pending PR commits and new scope is different, create a new branch before editing:
+  - Use stacked PRs (new branch from current feature branch) if PR2 depends on PR1.
+  - Use fresh branch from `main` if independent.
+- If uncommitted changes already exist on the wrong branch:
+  - Create/switch to the correct new branch first, then continue, or stash and re-apply deliberately.
+- Keep `.DS_Store` and unrelated local artifacts out of commits.
+- Commit discipline:
+  - Use small logical commits (`feat`, `test`, `docs`) scoped to one workstream.
+  - Do not mix unrelated fixes/features in one commit or one PR.
+- Before proposing merge to `main`, always run and report:
+  - `dart analyze`
+  - `dart test`
+- If no remote is configured, explicitly state that PRs cannot be opened yet and provide local-merge or remote-setup steps.
