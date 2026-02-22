@@ -177,6 +177,8 @@ final class TriPeaksReduceResult {
   const TriPeaksReduceResult({
     required this.state,
     required this.scoreDelta,
+    required this.scoreBreakdown,
+    required this.appliedMultiplier,
     this.error,
   });
 
@@ -187,6 +189,12 @@ final class TriPeaksReduceResult {
 
   /// Score delta applied while processing the action.
   final int scoreDelta;
+
+  /// Component-level explanation for the applied score delta.
+  final ScoreDeltaBreakdown scoreBreakdown;
+
+  /// Multiplier used on the accepted action's scoring computation.
+  final int appliedMultiplier;
 
   /// Error details when reduction fails.
   final TriPeaksRuleError? error;

@@ -101,11 +101,15 @@ void main() {
       expect(state.scoreState.totalScore, 5);
       expect(state.scoreState.lastDelta, 5);
       expect(state.scoreState.movesCount, 1);
+      expect(state.scoreState.currentMultiplier, 1);
+      expect(state.scoreState.lastBreakdown.totalDelta, 5);
 
       state = reduceTriPeaks(state, const DrawFromStockAction());
       expect(state.scoreState.totalScore, 5);
       expect(state.scoreState.lastDelta, 0);
       expect(state.scoreState.movesCount, 2);
+      expect(state.scoreState.currentMultiplier, 1);
+      expect(state.scoreState.lastBreakdown.drawPoints, 0);
 
       final invalid = tryReduceTriPeaks(
         state,
@@ -116,6 +120,12 @@ void main() {
       expect(invalid.state.scoreState.totalScore, 5);
       expect(invalid.state.scoreState.lastDelta, 0);
       expect(invalid.state.scoreState.movesCount, 3);
+      expect(invalid.appliedMultiplier, 1);
+      expect(invalid.scoreBreakdown.totalDelta, 0);
+      expect(
+        invalid.scoreBreakdown,
+        equals(invalid.state.scoreState.lastBreakdown),
+      );
     });
 
     test('custom scoring: invalid penalty can be negative', () {
@@ -134,6 +144,174 @@ void main() {
       expect(invalid.state.scoreState.totalScore, -3);
       expect(invalid.state.scoreState.lastDelta, -3);
       expect(invalid.state.scoreState.movesCount, 1);
+      expect(invalid.appliedMultiplier, 1);
+      expect(invalid.scoreBreakdown.invalidPenaltyPoints, -3);
+    });
+
+    test('multiplier defaults preserve legacy behavior', () {
+      final state = TriPeaksState.newGame(deck: _buildStreakUnlockDeck());
+      final first = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(18),
+        tick: 1,
+      );
+      expect(first.isSuccess, isTrue);
+      expect(first.appliedMultiplier, 1);
+      expect(first.scoreBreakdown.tableauBasePoints, 5);
+      expect(first.scoreBreakdown.multiplierExtraPoints, 0);
+      expect(first.scoreDelta, 5);
+    });
+
+    test('step multiplier uses pre-increment streak boundaries', () {
+      final config = ScoreConfig(
+        streakStepSize: 3,
+        multiplierStepIncrement: 1,
+        multiplierMax: 5,
+      );
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: config,
+      );
+
+      final r1 = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(18),
+        tick: 1,
+      );
+      state = r1.state;
+      expect(r1.appliedMultiplier, 1);
+      expect(state.streakState.currentStreak, 1);
+
+      final r2 = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(19),
+        tick: 2,
+      );
+      state = r2.state;
+      expect(r2.appliedMultiplier, 1);
+      expect(state.streakState.currentStreak, 2);
+
+      final r3 = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(20),
+        tick: 3,
+      );
+      state = r3.state;
+      expect(r3.appliedMultiplier, 1);
+      expect(state.streakState.currentStreak, 3);
+
+      final r4 = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(21),
+        tick: 4,
+      );
+      state = r4.state;
+      expect(r4.appliedMultiplier, 2);
+      expect(state.streakState.currentStreak, 4);
+    });
+
+    test('multiplier applies only to tableau base points', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildPeakBonusDeck(),
+        scoreConfig: const ScoreConfig(
+          pointsTableauToWaste: 10,
+          pointsPeakCleared: 50,
+          streakStepSize: 1,
+          multiplierStepIncrement: 1,
+          multiplierMax: 3,
+        ),
+      );
+      TriPeaksReduceResult? last;
+      for (final index in <int>[18, 19, 20, 21, 9, 10, 11, 3, 4, 0]) {
+        last = tryReduceTriPeaks(state, RemoveTableauCardAction(index));
+        state = last.state;
+      }
+      expect(last, isNotNull);
+      expect(last!.scoreBreakdown.tableauBasePoints, 10);
+      expect(last.scoreBreakdown.appliedMultiplier, 3);
+      expect(last.scoreBreakdown.multiplierExtraPoints, 20);
+      expect(last.scoreBreakdown.peakBonusPoints, 50);
+      expect(last.scoreBreakdown.totalDelta, 80);
+      final draw = tryReduceTriPeaks(state, const DrawFromStockAction());
+      expect(draw.appliedMultiplier, 1);
+      expect(draw.scoreBreakdown.tableauBasePoints, 0);
+      expect(draw.scoreBreakdown.multiplierExtraPoints, 0);
+      expect(draw.scoreBreakdown.peakBonusPoints, 0);
+      expect(draw.scoreBreakdown.drawPoints, 0);
+    });
+
+    test('breakdown invariants hold and match score state/result', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: const ScoreConfig(
+          pointsTableauToWaste: 7,
+          pointsDrawFromStock: 2,
+          penaltyInvalidAction: -3,
+          streakStepSize: 2,
+          multiplierStepIncrement: 1,
+          multiplierMax: 4,
+        ),
+      );
+      final results = <TriPeaksReduceResult>[
+        tryReduceTriPeaks(state, const RemoveTableauCardAction(18)),
+      ];
+      state = results.last.state;
+      results.add(tryReduceTriPeaks(state, const DrawFromStockAction()));
+      state = results.last.state;
+      results.add(tryReduceTriPeaks(state, const RemoveTableauCardAction(99)));
+
+      for (final result in results) {
+        final breakdown = result.scoreBreakdown;
+        expect(breakdown.appliedMultiplier, greaterThanOrEqualTo(1));
+        expect(
+          breakdown.multiplierExtraPoints,
+          breakdown.tableauBasePoints * (breakdown.appliedMultiplier - 1),
+        );
+        expect(
+          breakdown.totalDelta,
+          breakdown.tableauBasePoints +
+              breakdown.multiplierExtraPoints +
+              breakdown.peakBonusPoints +
+              breakdown.drawPoints +
+              breakdown.invalidPenaltyPoints,
+        );
+        expect(result.scoreDelta, breakdown.totalDelta);
+        expect(result.state.scoreState.lastDelta, breakdown.totalDelta);
+        expect(result.scoreBreakdown,
+            equals(result.state.scoreState.lastBreakdown));
+        expect(result.appliedMultiplier,
+            result.state.scoreState.currentMultiplier);
+      }
+    });
+
+    test('undo restores prior score state and result breakdown mirrors restore',
+        () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: const ScoreConfig(pointsDrawFromStock: 2),
+        undoConfig: const UndoConfig(enabled: true, maxSteps: 5),
+      );
+      final first = tryReduceTriPeaks(state, const DrawFromStockAction());
+      state = first.state;
+      final restoredSnapshot = state.scoreState;
+
+      final second = tryReduceTriPeaks(state, const DrawFromStockAction());
+      state = second.state;
+      expect(state.scoreState.totalScore, 4);
+
+      final undo = tryReduceTriPeaks(state, const UndoAction());
+      expect(undo.isSuccess, isTrue);
+      expect(undo.scoreDelta, 0);
+      expect(undo.state.scoreState.totalScore, restoredSnapshot.totalScore);
+      expect(undo.state.scoreState.lastDelta, restoredSnapshot.lastDelta);
+      expect(
+        undo.state.scoreState.currentMultiplier,
+        restoredSnapshot.currentMultiplier,
+      );
+      expect(
+          undo.state.scoreState.lastBreakdown, restoredSnapshot.lastBreakdown);
+      expect(undo.scoreBreakdown, equals(restoredSnapshot.lastBreakdown));
+      expect(undo.appliedMultiplier, restoredSnapshot.currentMultiplier);
     });
 
     test('determinism: same seed + actions + config => same score', () {
@@ -988,6 +1166,54 @@ void main() {
         result.sessionError?.code,
         TriPeaksSessionErrorCode.roundNotFinished,
       );
+    });
+
+    test('session status helper transitions deterministically', () {
+      var session = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        roundDecks: <List<Card>>[
+          _buildAlwaysLostDeck(
+            waste: const Card(Rank.ace, Suit.clubs),
+          ),
+          _buildAlwaysLostDeck(
+            waste: const Card(Rank.king, Suit.clubs),
+          ),
+          _buildAlwaysLostDeck(
+            waste: const Card(Rank.queen, Suit.clubs),
+          ),
+        ],
+      );
+      expect(session.status, TriPeaksSessionStatus.inProgress);
+
+      while (session.currentRound.canDrawFromStock) {
+        session = reduceTriPeaksSession(
+          session,
+          const PlayRoundAction(DrawFromStockAction()),
+        );
+      }
+      expect(session.currentRound.isLost, isTrue);
+      expect(session.status, TriPeaksSessionStatus.lost);
+
+      session = reduceTriPeaksSession(session, const StartNextRoundAction());
+      expect(session.status, TriPeaksSessionStatus.inProgress);
+
+      while (session.currentRound.canDrawFromStock) {
+        session = reduceTriPeaksSession(
+          session,
+          const PlayRoundAction(DrawFromStockAction()),
+        );
+      }
+      expect(session.status, TriPeaksSessionStatus.lost);
+
+      session = reduceTriPeaksSession(session, const StartNextRoundAction());
+      while (session.currentRound.canDrawFromStock) {
+        session = reduceTriPeaksSession(
+          session,
+          const PlayRoundAction(DrawFromStockAction()),
+        );
+      }
+      expect(session.isSessionFinished, isTrue);
+      expect(session.status, TriPeaksSessionStatus.gameOver);
     });
 
     test('session uses configured invalid-action penalty', () {
@@ -1875,7 +2101,7 @@ void main() {
 
     test('fingerprint is stable for fixed canonical state', () {
       final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), '4416c38c');
+      expect(stateFingerprint(state), '30fbd902');
     });
   });
 
