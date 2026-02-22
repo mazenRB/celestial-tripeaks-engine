@@ -56,7 +56,7 @@ If `verify` prints `OK`, replay reconstruction matches current session state.
 - `--rounds=3|6|10`
 - `--wrap-ace-king=true|false`
 - `--invalid-penalty=<int>`
-- `--bonus-spawn-policy=joker|tier-fixed-rank`
+- `--bonus-spawn-policy=joker|tier-fixed-rank|tier-random-rank`
 - `--bonus-default-tier=low|high`
 - `--bonus-slot2-streak=<int>`
 - `--bonus-slot3-streak=<int>`
@@ -64,4 +64,3 @@ If `verify` prints `OK`, replay reconstruction matches current session state.
 - `--strike-timeout=<int>`
 
 For full list, run `help` inside CLI.
-

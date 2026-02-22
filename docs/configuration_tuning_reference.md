@@ -127,6 +127,16 @@ Defaults:
 - `closeOnDraw = true`
 - `closeOnInvalidAction = true`
 
+`tierRandomRank` policy:
+
+- Uses deterministic rank selection inside tier domains.
+- Low tier domain: `2..10`
+- High tier domain: `A/J/Q/K`
+- Determinism inputs include round seed, spawn nonce, canonical 1-based slot
+  index, and explicit tier discriminator constants (`low=1`, `high=2`).
+- Legacy session decode derives missing round seed from session seed + round
+  index using the same deterministic round-seed formula.
+
 Risk notes:
 
 - Lower slot unlock thresholds increase volatility and combo potential.
@@ -146,6 +156,15 @@ Risk notes:
 - Higher attempt/solver bounds improve solvability checks but increase CPU.
 
 ## Session and Match
+
+### Session score surfaces
+
+- `RoundResult.finalScore` is captured on new round completions and may be
+  `null` only for legacy decoded payloads.
+- `cumulativeFinishedRoundsScoreTotal` sums non-null finished round scores.
+- `cumulativeIncludingCurrentRoundScoreTotal` adds current round score only when
+  the current round is still in progress to avoid double-counting.
+- Aborted rounds are included when a `finalScore` was captured at abort time.
 
 ### `TriPeaksRuleset`
 

@@ -139,6 +139,30 @@ final class TriPeaksSessionState {
   /// Whether all rounds in the session have been completed.
   bool get isSessionFinished => roundsCompleted >= ruleset.roundsPerGame;
 
+  /// Sum of known scores from completed rounds.
+  ///
+  /// Legacy decoded [RoundResult] entries without [RoundResult.finalScore] are
+  /// skipped deterministically.
+  int get cumulativeFinishedRoundsScoreTotal {
+    var total = 0;
+    for (final result in roundResults) {
+      total += result.finalScore ?? 0;
+    }
+    return total;
+  }
+
+  /// Cumulative score including the current in-progress round only.
+  ///
+  /// This avoids double-counting after round completion because finished rounds
+  /// are already represented in [roundResults].
+  int get cumulativeIncludingCurrentRoundScoreTotal {
+    if (isCurrentRoundFinished) {
+      return cumulativeFinishedRoundsScoreTotal;
+    }
+    return cumulativeFinishedRoundsScoreTotal +
+        currentRound.scoreState.totalScore;
+  }
+
   /// Derived deterministic status for UI/integration helpers.
   TriPeaksSessionStatus get status {
     if (isSessionFinished) {
@@ -368,6 +392,33 @@ final class TriPeaksSessionState {
     if (!bonusSlotsConfigResult.isSuccess) {
       return DecodeResult.failure(bonusSlotsConfigResult.error!);
     }
+    final seedRaw = map['seed'];
+    if (seedRaw != null && seedRaw is! int) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'seed must be int when present.',
+        ),
+      );
+    }
+    final currentRoundNumber = map['currentRoundNumber'];
+    final roundsCompleted = map['roundsCompleted'];
+    final roundsWon = map['roundsWon'];
+    final roundsLost = map['roundsLost'];
+    final roundsAborted = map['roundsAborted'];
+    if (currentRoundNumber is! int ||
+        roundsCompleted is! int ||
+        roundsWon is! int ||
+        roundsLost is! int ||
+        roundsAborted is! int) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'Invalid session numeric payload.',
+        ),
+      );
+    }
+
     final currentRoundMap = map['currentRound'];
     if (currentRoundMap is! Map<String, dynamic>) {
       return const DecodeResult.failure(
@@ -381,6 +432,14 @@ final class TriPeaksSessionState {
     if (!currentRoundResult.isSuccess) {
       return DecodeResult.failure(currentRoundResult.error!);
     }
+    final hasRoundSeed = currentRoundMap['roundSeed'] is int;
+    final decodedRound = currentRoundResult.value!;
+    final effectiveSessionSeed =
+        (seedRaw as int?) ?? TriPeaksSessionState.defaultSeed;
+    final derivedRoundSeed = effectiveSessionSeed + currentRoundNumber - 1;
+    final currentRound = hasRoundSeed
+        ? decodedRound
+        : decodedRound._copyWith(roundSeed: derivedRoundSeed);
 
     final roundResultsRaw = map['roundResults'];
     if (roundResultsRaw is! List<dynamic>) {
@@ -429,38 +488,10 @@ final class TriPeaksSessionState {
       }
     }
 
-    final seedRaw = map['seed'];
-    if (seedRaw != null && seedRaw is! int) {
-      return const DecodeResult.failure(
-        DecodeFailure(
-          code: DecodeFailureCode.invalidPayload,
-          message: 'seed must be int when present.',
-        ),
-      );
-    }
-
-    final currentRoundNumber = map['currentRoundNumber'];
-    final roundsCompleted = map['roundsCompleted'];
-    final roundsWon = map['roundsWon'];
-    final roundsLost = map['roundsLost'];
-    final roundsAborted = map['roundsAborted'];
-    if (currentRoundNumber is! int ||
-        roundsCompleted is! int ||
-        roundsWon is! int ||
-        roundsLost is! int ||
-        roundsAborted is! int) {
-      return const DecodeResult.failure(
-        DecodeFailure(
-          code: DecodeFailureCode.invalidPayload,
-          message: 'Invalid session numeric payload.',
-        ),
-      );
-    }
-
     return DecodeResult.success(
       TriPeaksSessionState._(
         ruleset: rulesetResult.value!,
-        seed: seedRaw as int?,
+        seed: seedRaw,
         roundDecks: roundDecks == null
             ? null
             : List<List<Card>>.unmodifiable(
@@ -478,7 +509,7 @@ final class TriPeaksSessionState {
         roundsLost: roundsLost,
         roundsAborted: roundsAborted,
         roundResults: List<RoundResult>.unmodifiable(roundResults),
-        currentRound: currentRoundResult.value!,
+        currentRound: currentRound,
       ),
     );
   }
