@@ -678,7 +678,7 @@ void _printHelp() {
   stdout.writeln(
       '  --strike-timeout=<int>       Strike timeout seconds metadata.');
   stdout.writeln(
-      '  --bonus-spawn-policy=joker|tier-fixed-rank Spawn behavior for slot2/3.');
+      '  --bonus-spawn-policy=joker|tier-fixed-rank|tier-random-rank Spawn behavior for slot2/3.');
   stdout.writeln(
       '  --bonus-default-tier=low|high  Tier used before first tableau success.');
   stdout.writeln(
@@ -1064,6 +1064,8 @@ _CliConfig _parseArgs(List<String> args) {
         bonusSpawnPolicy = BonusSlotSpawnPolicy.joker;
       } else if (value == 'tier-fixed-rank') {
         bonusSpawnPolicy = BonusSlotSpawnPolicy.tierFixedRank;
+      } else if (value == 'tier-random-rank') {
+        bonusSpawnPolicy = BonusSlotSpawnPolicy.tierRandomRank;
       }
       continue;
     }

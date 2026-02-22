@@ -41,6 +41,7 @@ final class TriPeaksState {
       removed: List<bool>.filled(_tableauSize, false, growable: false),
       waste: <Card>[initialWaste],
       stock: workingDeck.skip(_tableauSize + 1).toList(growable: false),
+      roundSeed: effectiveSeed,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
@@ -53,6 +54,7 @@ final class TriPeaksState {
       bonusSlotsState: initialBonusSlots,
       lastSuccessfulTableauRank: null,
       clearedPeaksAwardedMask: 0,
+      bonusAnchorSpawnNonce: 0,
       undoHistory: const <_TriPeaksSnapshot>[],
     );
   }
@@ -62,6 +64,7 @@ final class TriPeaksState {
     required List<bool> removed,
     required List<Card> waste,
     required List<Card> stock,
+    required this.roundSeed,
     required this.scoreConfig,
     required this.roundRulesConfig,
     required this.undoConfig,
@@ -74,6 +77,7 @@ final class TriPeaksState {
     required this.bonusSlotsState,
     required this.lastSuccessfulTableauRank,
     required this.clearedPeaksAwardedMask,
+    required this.bonusAnchorSpawnNonce,
     required List<_TriPeaksSnapshot> undoHistory,
   })  : tableau = List<Card>.unmodifiable(tableau),
         removed = List<bool>.unmodifiable(removed),
@@ -127,6 +131,9 @@ final class TriPeaksState {
   /// Stock pile from next-to-draw at index `0`.
   final List<Card> stock;
 
+  /// Deterministic round seed used for policy-level pseudo-random choices.
+  final int roundSeed;
+
   /// Scoring config used for this round.
   final ScoreConfig scoreConfig;
 
@@ -162,6 +169,9 @@ final class TriPeaksState {
 
   /// Bitmask tracking peaks already awarded with clear bonus.
   final int clearedPeaksAwardedMask;
+
+  /// Deterministic nonce consumed by bonus anchor random-rank spawns.
+  final int bonusAnchorSpawnNonce;
 
   /// Peak IDs that already awarded clear bonus.
   Set<int> get clearedPeaksAwarded {
@@ -287,6 +297,24 @@ final class TriPeaksState {
     return slotIndex <= bonusSlotsState.openSlotsCount;
   }
 
+  /// Returns whether [UseBonusSlotAction] is currently valid for [slotIndex].
+  bool canUseBonusSlot(int slotIndex) {
+    return isBonusSlotIndexInRange(slotIndex) && isBonusSlotOpen(slotIndex);
+  }
+
+  /// Bonus-slot indices accepted by [UseBonusSlotAction] right now.
+  List<int> get actionableBonusSlotIndices {
+    final out = <int>[];
+    for (var slotIndex = 1;
+        slotIndex <= bonusSlotsConfig.maxSlots;
+        slotIndex++) {
+      if (canUseBonusSlot(slotIndex)) {
+        out.add(slotIndex);
+      }
+    }
+    return List<int>.unmodifiable(out);
+  }
+
   Card? _slotTop(int slotIndex) {
     if (!isBonusSlotOpen(slotIndex)) {
       return null;
@@ -317,6 +345,7 @@ final class TriPeaksState {
     List<bool>? removed,
     List<Card>? waste,
     List<Card>? stock,
+    int? roundSeed,
     ScoreState? scoreState,
     StreakState? streakState,
     BonusSlotsState? bonusSlotsState,
@@ -324,6 +353,7 @@ final class TriPeaksState {
     Rank? lastSuccessfulTableauRank,
     bool clearLastSuccessfulTableauRank = false,
     int? clearedPeaksAwardedMask,
+    int? bonusAnchorSpawnNonce,
     List<_TriPeaksSnapshot>? undoHistory,
   }) {
     final nextBonusSlotsState = bonusSlotsState ?? this.bonusSlotsState;
@@ -334,6 +364,7 @@ final class TriPeaksState {
       removed: removed ?? this.removed,
       waste: syncedWaste,
       stock: stock ?? this.stock,
+      roundSeed: roundSeed ?? this.roundSeed,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,
@@ -349,6 +380,8 @@ final class TriPeaksState {
           : (lastSuccessfulTableauRank ?? this.lastSuccessfulTableauRank),
       clearedPeaksAwardedMask:
           clearedPeaksAwardedMask ?? this.clearedPeaksAwardedMask,
+      bonusAnchorSpawnNonce:
+          bonusAnchorSpawnNonce ?? this.bonusAnchorSpawnNonce,
       undoHistory: undoHistory ?? _undoHistory,
     );
   }
@@ -365,6 +398,7 @@ final class TriPeaksState {
       bonusSlotsState: bonusSlotsState,
       lastSuccessfulTableauRank: lastSuccessfulTableauRank,
       clearedPeaksAwardedMask: clearedPeaksAwardedMask,
+      bonusAnchorSpawnNonce: bonusAnchorSpawnNonce,
     );
   }
 
@@ -380,6 +414,7 @@ final class TriPeaksState {
       bonusSlotsState: snapshot.bonusSlotsState,
       lastSuccessfulTableauRank: snapshot.lastSuccessfulTableauRank,
       clearedPeaksAwardedMask: snapshot.clearedPeaksAwardedMask,
+      bonusAnchorSpawnNonce: snapshot.bonusAnchorSpawnNonce,
     );
   }
 
@@ -427,6 +462,7 @@ final class TriPeaksState {
       'removed': removed,
       'waste': waste.map((card) => card.toMap()).toList(growable: false),
       'stock': stock.map((card) => card.toMap()).toList(growable: false),
+      'roundSeed': roundSeed,
       'scoreConfig': scoreConfig.toMap(),
       'roundRulesConfig': roundRulesConfig.toMap(),
       'undoConfig': undoConfig.toMap(),
@@ -440,6 +476,7 @@ final class TriPeaksState {
       if (lastSuccessfulTableauRank case final rank?)
         'lastSuccessfulTableauRank': rank.name,
       'clearedPeaksAwardedMask': clearedPeaksAwardedMask,
+      'bonusAnchorSpawnNonce': bonusAnchorSpawnNonce,
       'undoHistory': _undoHistory
           .map((snapshot) => snapshot.toMap())
           .toList(growable: false),
@@ -484,6 +521,26 @@ final class TriPeaksState {
         DecodeFailure(
           code: DecodeFailureCode.invalidPayload,
           message: 'removed must be a list of bool.',
+        ),
+      );
+    }
+
+    final roundSeed = map['roundSeed'];
+    if (roundSeed != null && roundSeed is! int) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'roundSeed must be int when present.',
+        ),
+      );
+    }
+
+    final bonusAnchorSpawnNonce = map['bonusAnchorSpawnNonce'];
+    if (bonusAnchorSpawnNonce != null && bonusAnchorSpawnNonce is! int) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'bonusAnchorSpawnNonce must be int when present.',
         ),
       );
     }
@@ -707,6 +764,7 @@ final class TriPeaksState {
         removed: removed.cast<bool>(),
         waste: normalizedWaste,
         stock: stockResult.value!,
+        roundSeed: roundSeed as int? ?? defaultSeed,
         scoreConfig: scoreConfigResult.value!,
         roundRulesConfig: roundRulesResult.value!,
         undoConfig: undoConfigResult.value!,
@@ -719,6 +777,7 @@ final class TriPeaksState {
         bonusSlotsState: normalizedBonusSlots,
         lastSuccessfulTableauRank: decodedLastSuccessfulTableauRank,
         clearedPeaksAwardedMask: clearedPeaksAwardedMask as int? ?? 0,
+        bonusAnchorSpawnNonce: bonusAnchorSpawnNonce as int? ?? 0,
         undoHistory: history,
       ),
     );

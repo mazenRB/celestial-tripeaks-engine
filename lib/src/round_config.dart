@@ -816,6 +816,7 @@ final class StrikeTimerState {
 enum BonusSlotSpawnPolicy {
   joker,
   tierFixedRank,
+  tierRandomRank,
 }
 
 /// Tier used when spawning deterministic anchor cards.

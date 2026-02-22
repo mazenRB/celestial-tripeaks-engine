@@ -838,6 +838,150 @@ void main() {
       expect(slot2Top.rank, Rank.queen);
     });
 
+    test('tierRandomRank spawns low-tier rank from 2..10 domain', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+
+      final slot2Top = state.bonusSlotsState.slots[1].single;
+      expect(slot2Top.isAnchor, isTrue);
+      final rank = slot2Top.rank;
+      expect(rank.value >= 2 && rank.value <= 10, isTrue);
+    });
+
+    test('tierRandomRank spawns high-tier rank from A/J/Q/K domain', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildHighTierUnlockDeck(),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
+
+      final slot2Top = state.bonusSlotsState.slots[1].single;
+      expect(slot2Top.isAnchor, isTrue);
+      expect(
+        <Rank>{Rank.ace, Rank.jack, Rank.queen, Rank.king}.contains(
+          slot2Top.rank,
+        ),
+        isTrue,
+      );
+    });
+
+    test('tierRandomRank is deterministic for same seed and action sequence',
+        () {
+      TriPeaksState run(int seed) {
+        var state = TriPeaksState.newGame(
+          seed: seed,
+          deck: _buildStreakUnlockDeck(),
+          bonusSlotsConfig: const BonusSlotsConfig(
+            spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+          ),
+        );
+        state =
+            reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+        state =
+            reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+        state =
+            reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+        state =
+            reduceTriPeaks(state, const RemoveTableauCardAction(21), tick: 4);
+        state =
+            reduceTriPeaks(state, const RemoveTableauCardAction(22), tick: 5);
+        state =
+            reduceTriPeaks(state, const RemoveTableauCardAction(23), tick: 6);
+        return state;
+      }
+
+      final a = run(77);
+      final b = run(77);
+      expect(
+        a.bonusSlotsState.slots[1].single.rank,
+        b.bonusSlotsState.slots[1].single.rank,
+      );
+      expect(
+        a.bonusSlotsState.slots[2].single.rank,
+        b.bonusSlotsState.slots[2].single.rank,
+      );
+      expect(a.bonusAnchorSpawnNonce, b.bonusAnchorSpawnNonce);
+    });
+
+    test('tierRandomRank varies across seeds while remaining deterministic',
+        () {
+      final seen = <Rank>{};
+      for (var seed = 1; seed <= 12; seed++) {
+        var state = TriPeaksState.newGame(
+          seed: seed,
+          deck: _buildStreakUnlockDeck(),
+          bonusSlotsConfig: const BonusSlotsConfig(
+            spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+          ),
+        );
+        state =
+            reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+        state =
+            reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+        state =
+            reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+        seen.add(state.bonusSlotsState.slots[1].single.rank);
+      }
+      expect(seen.length, greaterThan(1));
+    });
+
+    test('tierRandomRank undo restores nonce and re-apply gives same rank', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        undoConfig: const UndoConfig(maxSteps: 5),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+
+      final beforeSpawnNonce = state.bonusAnchorSpawnNonce;
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+      final firstRank = state.bonusSlotsState.slots[1].single.rank;
+      final afterSpawnNonce = state.bonusAnchorSpawnNonce;
+      expect(afterSpawnNonce, beforeSpawnNonce + 1);
+
+      state = reduceTriPeaks(state, const UndoAction());
+      expect(state.bonusAnchorSpawnNonce, beforeSpawnNonce);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 4);
+      expect(state.bonusSlotsState.slots[1].single.rank, firstRank);
+      expect(state.bonusAnchorSpawnNonce, afterSpawnNonce);
+    });
+
+    test('tierRandomRank uses canonical 1-based slot index in mixing', () {
+      var state = TriPeaksState.newGame(
+        seed: 17,
+        deck: _buildStreakUnlockDeck(),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+      final nonceBeforeSpawn = state.bonusAnchorSpawnNonce;
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+
+      final expectedRank = _expectedTierRandomRank(
+        roundSeed: state.roundSeed,
+        spawnNonce: nonceBeforeSpawn,
+        slotIndex: 2,
+        tier: BonusSlotAnchorTier.low,
+      );
+      expect(state.bonusSlotsState.slots[1].single.rank, expectedRank);
+    });
+
     test(
       'placing any tableau card onto joker slot is accepted and consumes joker',
       () {
@@ -977,6 +1121,41 @@ void main() {
 
       expect(result.isSuccess, isFalse);
       expect(result.error?.code, TriPeaksErrorCode.bonusSlotClosed);
+    });
+
+    test('actionable bonus slot indices match use-slot acceptance predicate',
+        () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.joker,
+          spawnOnOpenSlot2AtStreak: 3,
+          spawnOnOpenSlot3AtStreak: 6,
+        ),
+      );
+
+      expect(state.actionableBonusSlotIndices, equals(<int>[1]));
+      final fromState = state.actionableBonusSlotIndices;
+      expect(
+        () => fromState.add(2),
+        throwsUnsupportedError,
+      );
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+      expect(state.actionableBonusSlotIndices, equals(<int>[1, 2]));
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(21), tick: 4);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(22), tick: 5);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(23), tick: 6);
+      expect(state.actionableBonusSlotIndices, equals(<int>[1, 2, 3]));
+
+      for (var slot = 1; slot <= state.bonusSlotsConfig.maxSlots; slot++) {
+        final expected = state.canUseBonusSlot(slot);
+        final actual = state.actionableBonusSlotIndices.contains(slot);
+        expect(actual, expected);
+      }
     });
 
     test(
@@ -1144,10 +1323,31 @@ void main() {
       expect(session.roundsCompleted, 1);
       expect(session.roundsLost, 1);
       expect(session.roundResults.last.outcome, RoundOutcome.lost);
+      expect(
+        session.roundResults.last.finalScore,
+        session.currentRound.scoreState.totalScore,
+      );
+      expect(
+        session.cumulativeFinishedRoundsScoreTotal,
+        session.roundResults.last.finalScore,
+      );
+      expect(
+        session.cumulativeIncludingCurrentRoundScoreTotal,
+        session.cumulativeFinishedRoundsScoreTotal,
+      );
 
       session = reduceTriPeaksSession(session, const StartNextRoundAction());
       expect(session.currentRoundNumber, 2);
       expect(session.roundsCompleted, 1);
+      expect(
+        session.cumulativeFinishedRoundsScoreTotal,
+        session.roundResults.first.finalScore,
+      );
+      expect(
+        session.cumulativeIncludingCurrentRoundScoreTotal,
+        session.cumulativeFinishedRoundsScoreTotal +
+            session.currentRound.scoreState.totalScore,
+      );
     });
 
     test('cannot start next round before current round finishes', () {
@@ -1166,6 +1366,22 @@ void main() {
         result.sessionError?.code,
         TriPeaksSessionErrorCode.roundNotFinished,
       );
+    });
+
+    test('session decode derives missing roundSeed from session seed + index',
+        () {
+      final session = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        seed: 40,
+      );
+      final map = session.toMap();
+      final currentRound = map['currentRound'] as Map<String, dynamic>;
+      currentRound.remove('roundSeed');
+
+      final decoded = TriPeaksSessionState.tryFromMap(map);
+      expect(decoded.isSuccess, isTrue);
+      final restored = decoded.value!;
+      expect(restored.currentRound.roundSeed, 40);
     });
 
     test('session status helper transitions deterministically', () {
@@ -1255,9 +1471,102 @@ void main() {
       expect(next.roundResults, hasLength(1));
       expect(next.roundResults.single.outcome, RoundOutcome.aborted);
       expect(next.roundResults.single.abortReason, AbortReason.userQuit);
+      expect(next.roundResults.single.finalScore, 0);
       expect(next.currentRound.tableau, equals(expectedRoundTwo.tableau));
       expect(next.currentRound.waste, equals(expectedRoundTwo.waste));
       expect(next.currentRound.stock, equals(expectedRoundTwo.stock));
+    });
+
+    test('cumulative totals are deterministic and avoid double counting', () {
+      var session = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        roundDecks: <List<Card>>[
+          _buildAlwaysLostDeck(
+            waste: const Card(Rank.ace, Suit.clubs),
+          ),
+          _buildAlwaysLostDeck(
+            waste: const Card(Rank.king, Suit.clubs),
+          ),
+          _buildAlwaysLostDeck(
+            waste: const Card(Rank.queen, Suit.clubs),
+          ),
+        ],
+        scoreConfig: const ScoreConfig(pointsDrawFromStock: 1),
+      );
+
+      session = reduceTriPeaksSession(
+        session,
+        const PlayRoundAction(DrawFromStockAction()),
+      );
+      expect(session.isCurrentRoundFinished, isFalse);
+      expect(session.cumulativeFinishedRoundsScoreTotal, 0);
+      expect(
+        session.cumulativeIncludingCurrentRoundScoreTotal,
+        session.currentRound.scoreState.totalScore,
+      );
+
+      while (session.currentRound.canDrawFromStock) {
+        session = reduceTriPeaksSession(
+          session,
+          const PlayRoundAction(DrawFromStockAction()),
+        );
+      }
+      final finishedRoundOneScore = session.currentRound.scoreState.totalScore;
+      expect(session.isCurrentRoundFinished, isTrue);
+      expect(session.roundResults.last.finalScore, finishedRoundOneScore);
+      expect(session.cumulativeFinishedRoundsScoreTotal, finishedRoundOneScore);
+      expect(
+        session.cumulativeIncludingCurrentRoundScoreTotal,
+        finishedRoundOneScore,
+      );
+
+      session = reduceTriPeaksSession(session, const StartNextRoundAction());
+      expect(session.currentRound.scoreState.totalScore, 0);
+      expect(session.cumulativeFinishedRoundsScoreTotal, finishedRoundOneScore);
+      expect(
+        session.cumulativeIncludingCurrentRoundScoreTotal,
+        finishedRoundOneScore,
+      );
+    });
+
+    test('null finalScore values are skipped by cumulative finished total', () {
+      final decode = RoundResult.tryFromMap(
+        <String, dynamic>{
+          'schemaVersion': 1,
+          'type': 'round_result',
+          'roundNumber': 1,
+          'outcome': 'lost',
+        },
+      );
+      expect(decode.isSuccess, isTrue);
+      expect(decode.value!.finalScore, isNull);
+
+      final baseSession = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        seed: 99,
+      );
+      final map = baseSession.toMap();
+      map['roundResults'] = <Map<String, dynamic>>[
+        <String, dynamic>{
+          'schemaVersion': 1,
+          'type': 'round_result',
+          'roundNumber': 1,
+          'outcome': 'lost',
+        },
+        <String, dynamic>{
+          'schemaVersion': 1,
+          'type': 'round_result',
+          'roundNumber': 2,
+          'outcome': 'aborted',
+          'abortReason': 'userSkip',
+          'finalScore': 7,
+        },
+      ];
+      final rebuilt = TriPeaksSessionState.tryFromMap(map);
+      expect(rebuilt.isSuccess, isTrue);
+      final withLegacyResult = rebuilt.value!;
+
+      expect(withLegacyResult.cumulativeFinishedRoundsScoreTotal, 7);
     });
 
     test('abort on last round finishes session', () {
@@ -1639,6 +1948,7 @@ void main() {
             result.roundNumber,
             result.outcome,
             result.abortReason,
+            result.finalScore,
           );
         }).toList(growable: false),
         equals(
@@ -1647,6 +1957,7 @@ void main() {
               result.roundNumber,
               result.outcome,
               result.abortReason,
+              result.finalScore,
             );
           }).toList(growable: false),
         ),
@@ -1769,6 +2080,7 @@ void main() {
             result.roundNumber,
             result.outcome,
             result.abortReason,
+            result.finalScore,
           );
         }).toList(growable: false),
         equals(
@@ -1777,6 +2089,7 @@ void main() {
               result.roundNumber,
               result.outcome,
               result.abortReason,
+              result.finalScore,
             );
           }).toList(growable: false),
         ),
@@ -1840,6 +2153,63 @@ void main() {
       },
     );
 
+    test(
+      'tierRandomRank anchor behavior is preserved in replay reconstruction',
+      () {
+        var liveState = TriPeaksSessionState.newSession(
+          ruleset: TriPeaksRuleset.threeRounds,
+          seed: 11,
+          streakConfig: const StreakConfig(resetOnDraw: false),
+          bonusSlotsConfig: const BonusSlotsConfig(
+            spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+          ),
+        );
+        var replay = TriPeaksReplay.newSession(
+          seed: liveState.seed ?? TriPeaksSessionState.defaultSeed,
+          ruleset: liveState.ruleset,
+          scoreConfig: liveState.scoreConfig,
+          roundRulesConfig: liveState.roundRulesConfig,
+          undoConfig: liveState.undoConfig,
+          streakConfig: liveState.streakConfig,
+          strikeTimerConfig: liveState.strikeTimerConfig,
+          bonusSlotsConfig: liveState.bonusSlotsConfig,
+        );
+
+        var guard = 0;
+        while (liveState.currentRound.streakState.currentStreak < 3 &&
+            guard < 64) {
+          final moves =
+              liveState.currentRound.availableMoves.removableTableauIndices;
+          final action = moves.isNotEmpty
+              ? PlayRoundAction(RemoveTableauCardAction(moves.first))
+              : const PlayRoundAction(DrawFromStockAction());
+          final recorded = recordAction(replay, liveState, action);
+          replay = recorded.replay;
+          liveState = recorded.state;
+          guard++;
+        }
+        expect(
+          liveState.currentRound.streakState.currentStreak,
+          greaterThanOrEqualTo(3),
+        );
+
+        final rebuilt = replayToState(replay);
+        expect(
+          rebuilt.currentRound.bonusSlotsState.slots[1].single.isAnchor,
+          isTrue,
+        );
+        expect(
+          rebuilt.currentRound.bonusSlotsState.slots[1].single.rank,
+          liveState.currentRound.bonusSlotsState.slots[1].single.rank,
+        );
+        expect(
+          rebuilt.currentRound.bonusAnchorSpawnNonce,
+          liveState.currentRound.bonusAnchorSpawnNonce,
+        );
+        expect(sessionFingerprint(rebuilt), sessionFingerprint(liveState));
+      },
+    );
+
     test('unsupported replay schema returns typed failure', () {
       final decode = ReplaySession.tryFromMap(
         <String, dynamic>{
@@ -1872,6 +2242,54 @@ void main() {
   });
 
   group('Serialization', () {
+    test('round result finalScore is backward compatible', () {
+      final legacy = RoundResult.tryFromMap(
+        <String, dynamic>{
+          'schemaVersion': 1,
+          'type': 'round_result',
+          'roundNumber': 1,
+          'outcome': 'won',
+        },
+      );
+      expect(legacy.isSuccess, isTrue);
+      expect(legacy.value!.finalScore, isNull);
+
+      final current = RoundResult.tryFromMap(
+        <String, dynamic>{
+          'schemaVersion': 1,
+          'type': 'round_result',
+          'roundNumber': 2,
+          'outcome': 'lost',
+          'finalScore': 11,
+        },
+      );
+      expect(current.isSuccess, isTrue);
+      expect(current.value!.finalScore, 11);
+    });
+
+    test('round result decode rejects invalid finalScore type', () {
+      final decoded = RoundResult.tryFromMap(
+        <String, dynamic>{
+          'schemaVersion': 1,
+          'type': 'round_result',
+          'roundNumber': 1,
+          'outcome': 'won',
+          'finalScore': '11',
+        },
+      );
+      expect(decoded.isSuccess, isFalse);
+      expect(decoded.error?.code, DecodeFailureCode.invalidPayload);
+    });
+
+    test('bonus slots config round-trip supports tierRandomRank', () {
+      const config = BonusSlotsConfig(
+        spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+      );
+      final decoded = BonusSlotsConfig.tryFromMap(config.toMap());
+      expect(decoded.isSuccess, isTrue);
+      expect(decoded.value!.spawnPolicy, BonusSlotSpawnPolicy.tierRandomRank);
+    });
+
     test('bonus slots config map is stable (golden)', () {
       const config = BonusSlotsConfig(
         enabled: true,
@@ -1956,6 +2374,8 @@ void main() {
         restored.streakState.currentStreak,
         progressed.streakState.currentStreak,
       );
+      expect(restored.roundSeed, progressed.roundSeed);
+      expect(restored.bonusAnchorSpawnNonce, progressed.bonusAnchorSpawnNonce);
       expect(restored.undoStepsAvailable, progressed.undoStepsAvailable);
     });
 
@@ -2101,7 +2521,7 @@ void main() {
 
     test('fingerprint is stable for fixed canonical state', () {
       final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), '30fbd902');
+      expect(stateFingerprint(state), '27be6eff');
     });
   });
 
@@ -3462,4 +3882,68 @@ MatchScoreState _applyMatchEvents(
     state = reduceMatchScore(state, event);
   }
   return state;
+}
+
+Rank _expectedTierRandomRank({
+  required int roundSeed,
+  required int spawnNonce,
+  required int slotIndex,
+  required BonusSlotAnchorTier tier,
+}) {
+  const lowDomain = <Rank>[
+    Rank.two,
+    Rank.three,
+    Rank.four,
+    Rank.five,
+    Rank.six,
+    Rank.seven,
+    Rank.eight,
+    Rank.nine,
+    Rank.ten,
+  ];
+  const highDomain = <Rank>[
+    Rank.ace,
+    Rank.jack,
+    Rank.queen,
+    Rank.king,
+  ];
+  final (tierDiscriminator, domain) = switch (tier) {
+    BonusSlotAnchorTier.low => (1, lowDomain),
+    BonusSlotAnchorTier.high => (2, highDomain),
+  };
+  final index = _expectedDeterministicIndex(
+    roundSeed: roundSeed,
+    spawnNonce: spawnNonce,
+    slotIndex: slotIndex,
+    tierDiscriminator: tierDiscriminator,
+    domainSize: domain.length,
+  );
+  return domain[index];
+}
+
+int _expectedDeterministicIndex({
+  required int roundSeed,
+  required int spawnNonce,
+  required int slotIndex,
+  required int tierDiscriminator,
+  required int domainSize,
+}) {
+  var x = 0x9e3779b9;
+  x ^= roundSeed;
+  x = _expectedMix32(x + 0x85ebca6b);
+  x ^= (spawnNonce + 1) * 0x27d4eb2d;
+  x = _expectedMix32(x);
+  x ^= slotIndex * 0x165667b1;
+  x = _expectedMix32(x + (tierDiscriminator * 0x9e3779b1));
+  return (x & 0x7fffffff) % domainSize;
+}
+
+int _expectedMix32(int value) {
+  var x = value & 0xffffffff;
+  x ^= (x >> 16);
+  x = (x * 0x7feb352d) & 0xffffffff;
+  x ^= (x >> 15);
+  x = (x * 0x846ca68b) & 0xffffffff;
+  x ^= (x >> 16);
+  return x & 0xffffffff;
 }

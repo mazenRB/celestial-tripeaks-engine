@@ -212,11 +212,13 @@ TriPeaksReduceResult tryReduceTriPeaks(
         state.tableau[index],
         state.bonusSlotsConfig,
       );
-      final nextBonusSlotsState = _withRecomputedOpenSlotsAndSpawn(
+      final spawnResult = _withRecomputedOpenSlotsAndSpawn(
         state.bonusSlotsState.copyWith(slots: nextSlots),
         state.bonusSlotsConfig,
         nextStreak,
         state.tableau[index].rank,
+        state.roundSeed,
+        state.bonusAnchorSpawnNonce,
       );
       return (
         state: state._copyWith(
@@ -228,9 +230,10 @@ TriPeaksReduceResult tryReduceTriPeaks(
           ),
           streakState: nextStreak,
           strikeTimerState: nextStrikeTimer,
-          bonusSlotsState: nextBonusSlotsState,
+          bonusSlotsState: spawnResult.bonusSlotsState,
           lastSuccessfulTableauRank: state.tableau[index].rank,
           clearedPeaksAwardedMask: peakBonus.nextAwardedMask,
+          bonusAnchorSpawnNonce: spawnResult.nextSpawnNonce,
           undoHistory: nextHistory,
         ),
         scoreDelta: delta,
@@ -414,15 +417,21 @@ BonusSlotsState _withRecomputedOpenSlots(
   return _withOpenSlotsCount(state, openSlotsCount);
 }
 
-BonusSlotsState _withRecomputedOpenSlotsAndSpawn(
+({BonusSlotsState bonusSlotsState, int nextSpawnNonce})
+    _withRecomputedOpenSlotsAndSpawn(
   BonusSlotsState state,
   BonusSlotsConfig config,
   StreakState streakState,
   Rank? lastSuccessfulTableauRank,
+  int roundSeed,
+  int spawnNonce,
 ) {
   final openSlotsCount = _computeOpenSlotsCount(streakState, config);
   if (openSlotsCount <= state.openSlotsCount) {
-    return _withOpenSlotsCount(state, openSlotsCount);
+    return (
+      bonusSlotsState: _withOpenSlotsCount(state, openSlotsCount),
+      nextSpawnNonce: spawnNonce,
+    );
   }
 
   final nextSlots = <List<Card>>[
@@ -431,21 +440,32 @@ BonusSlotsState _withRecomputedOpenSlotsAndSpawn(
     List<Card>.from(state.slots[2]),
   ];
 
+  var nextSpawnNonce = spawnNonce;
   for (var slotIndex = state.openSlotsCount + 1;
       slotIndex <= openSlotsCount;
       slotIndex++) {
     if (nextSlots[slotIndex - 1].isEmpty) {
       nextSlots[slotIndex - 1].add(
-        _spawnOpenSlotAnchor(config, lastSuccessfulTableauRank),
+        _spawnOpenSlotAnchor(
+          config,
+          lastSuccessfulTableauRank,
+          roundSeed: roundSeed,
+          spawnNonce: nextSpawnNonce,
+          slotIndex: slotIndex,
+        ),
       );
+      nextSpawnNonce++;
     }
   }
 
-  return state.copyWith(
-    openSlotsCount: openSlotsCount,
-    slots: List<List<Card>>.unmodifiable(
-      nextSlots.map((slot) => List<Card>.unmodifiable(slot)).toList(),
+  return (
+    bonusSlotsState: state.copyWith(
+      openSlotsCount: openSlotsCount,
+      slots: List<List<Card>>.unmodifiable(
+        nextSlots.map((slot) => List<Card>.unmodifiable(slot)).toList(),
+      ),
     ),
+    nextSpawnNonce: nextSpawnNonce,
   );
 }
 
@@ -561,13 +581,29 @@ List<List<Card>> _appendTableauCardToSlot(
   return next;
 }
 
-Card _spawnOpenSlotAnchor(BonusSlotsConfig config, Rank? lastSuccessfulRank) {
+Card _spawnOpenSlotAnchor(
+  BonusSlotsConfig config,
+  Rank? lastSuccessfulRank, {
+  required int roundSeed,
+  required int spawnNonce,
+  required int slotIndex,
+}) {
   switch (config.spawnPolicy) {
     case BonusSlotSpawnPolicy.joker:
       return const Card.joker();
     case BonusSlotSpawnPolicy.tierFixedRank:
       return Card.anchor(
         _tierFixedAnchorRank(config, lastSuccessfulRank),
+      );
+    case BonusSlotSpawnPolicy.tierRandomRank:
+      return Card.anchor(
+        _tierRandomAnchorRank(
+          config,
+          lastSuccessfulRank,
+          roundSeed: roundSeed,
+          spawnNonce: spawnNonce,
+          slotIndex: slotIndex,
+        ),
       );
   }
 }
@@ -586,6 +622,80 @@ Rank _tierFixedAnchorRank(
     case BonusSlotAnchorTier.high:
       return config.highTierAnchorRank;
   }
+}
+
+const List<Rank> _lowTierAnchorRanks = <Rank>[
+  Rank.two,
+  Rank.three,
+  Rank.four,
+  Rank.five,
+  Rank.six,
+  Rank.seven,
+  Rank.eight,
+  Rank.nine,
+  Rank.ten,
+];
+
+const List<Rank> _highTierAnchorRanks = <Rank>[
+  Rank.ace,
+  Rank.jack,
+  Rank.queen,
+  Rank.king,
+];
+
+const int _tierMixLow = 1;
+const int _tierMixHigh = 2;
+
+Rank _tierRandomAnchorRank(
+  BonusSlotsConfig config,
+  Rank? lastSuccessfulRank, {
+  required int roundSeed,
+  required int spawnNonce,
+  required int slotIndex,
+}) {
+  final tier = _tierForLastSuccessfulRank(
+    lastSuccessfulRank,
+    config.defaultAnchorTierWhenUnknown,
+  );
+  final (tierDiscriminator, domain) = switch (tier) {
+    BonusSlotAnchorTier.low => (_tierMixLow, _lowTierAnchorRanks),
+    BonusSlotAnchorTier.high => (_tierMixHigh, _highTierAnchorRanks),
+  };
+  final index = _deterministicIndex(
+    roundSeed: roundSeed,
+    spawnNonce: spawnNonce,
+    slotIndex: slotIndex,
+    tierDiscriminator: tierDiscriminator,
+    domainSize: domain.length,
+  );
+  return domain[index];
+}
+
+int _deterministicIndex({
+  required int roundSeed,
+  required int spawnNonce,
+  required int slotIndex,
+  required int tierDiscriminator,
+  required int domainSize,
+}) {
+  var x = 0x9e3779b9;
+  x ^= roundSeed;
+  x = _mix32(x + 0x85ebca6b);
+  x ^= (spawnNonce + 1) * 0x27d4eb2d;
+  x = _mix32(x);
+  x ^= slotIndex * 0x165667b1;
+  x = _mix32(x + (tierDiscriminator * 0x9e3779b1));
+  return (x & 0x7fffffff) % domainSize;
+}
+
+int _mix32(int value) {
+  var x = value & 0xffffffff;
+  x ^= (x >> 16);
+  x = (x * 0x7feb352d) & 0xffffffff;
+  x ^= (x >> 15);
+  x = (x * 0x846ca68b) & 0xffffffff;
+  x ^= (x >> 16);
+  return x & 0xffffffff;
 }
 
 BonusSlotAnchorTier _tierForLastSuccessfulRank(

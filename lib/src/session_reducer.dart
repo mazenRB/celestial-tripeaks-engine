@@ -72,6 +72,7 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
       final result = RoundResult(
         roundNumber: state.currentRoundNumber,
         outcome: nextRound.isWon ? RoundOutcome.won : RoundOutcome.lost,
+        finalScore: nextRound.scoreState.totalScore,
       );
       return TriPeaksSessionReduceResult(
         state: state._copyWith(
@@ -139,6 +140,7 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
         roundNumber: state.currentRoundNumber,
         outcome: RoundOutcome.aborted,
         abortReason: abortReason,
+        finalScore: state.currentRound.scoreState.totalScore,
       );
 
       if (!state._hasNextRound) {
@@ -259,7 +261,7 @@ TriPeaksRuleError? _validateAction(TriPeaksState state, TriPeaksAction action) {
               'Bonus slot index $slotIndex is out of range 1..${state.bonusSlotsConfig.maxSlots}.',
         );
       }
-      if (slotIndex > state.bonusSlotsState.openSlotsCount) {
+      if (!state.canUseBonusSlot(slotIndex)) {
         return TriPeaksRuleError(
           code: TriPeaksErrorCode.bonusSlotClosed,
           message: 'Bonus slot $slotIndex is closed.',
@@ -303,6 +305,7 @@ final class _TriPeaksSnapshot {
     required this.bonusSlotsState,
     required this.lastSuccessfulTableauRank,
     required this.clearedPeaksAwardedMask,
+    required this.bonusAnchorSpawnNonce,
   });
 
   final List<Card> tableau;
@@ -315,6 +318,7 @@ final class _TriPeaksSnapshot {
   final BonusSlotsState bonusSlotsState;
   final Rank? lastSuccessfulTableauRank;
   final int clearedPeaksAwardedMask;
+  final int bonusAnchorSpawnNonce;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -331,6 +335,7 @@ final class _TriPeaksSnapshot {
       if (lastSuccessfulTableauRank case final rank?)
         'lastSuccessfulTableauRank': rank.name,
       'clearedPeaksAwardedMask': clearedPeaksAwardedMask,
+      'bonusAnchorSpawnNonce': bonusAnchorSpawnNonce,
     };
   }
 
@@ -435,11 +440,14 @@ final class _TriPeaksSnapshot {
       }
     }
     final clearedPeaksAwardedMask = map['clearedPeaksAwardedMask'];
-    if (clearedPeaksAwardedMask is! int) {
+    final bonusAnchorSpawnNonce = map['bonusAnchorSpawnNonce'];
+    if (clearedPeaksAwardedMask is! int ||
+        (bonusAnchorSpawnNonce != null && bonusAnchorSpawnNonce is! int)) {
       return const DecodeResult.failure(
         DecodeFailure(
           code: DecodeFailureCode.invalidPayload,
-          message: 'clearedPeaksAwardedMask must be an int.',
+          message:
+              'clearedPeaksAwardedMask and bonusAnchorSpawnNonce must be int.',
         ),
       );
     }
@@ -455,6 +463,7 @@ final class _TriPeaksSnapshot {
         bonusSlotsState: bonusSlotsResult.value!,
         lastSuccessfulTableauRank: decodedLastSuccessfulTableauRank,
         clearedPeaksAwardedMask: clearedPeaksAwardedMask,
+        bonusAnchorSpawnNonce: bonusAnchorSpawnNonce as int? ?? 0,
       ),
     );
   }

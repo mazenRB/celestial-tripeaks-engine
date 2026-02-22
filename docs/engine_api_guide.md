@@ -74,6 +74,17 @@ final result = tryReduceSession(
 session = result.state;
 ```
 
+Session score helpers:
+
+- `cumulativeFinishedRoundsScoreTotal`: sum of known `RoundResult.finalScore`
+  entries.
+- `cumulativeIncludingCurrentRoundScoreTotal`: includes current round score only
+  while the current round is in progress (prevents double-counting finished
+  rounds already in `roundResults`).
+
+`RoundResult.finalScore` may be `null` for legacy decoded payloads; unknown
+scores are skipped deterministically in cumulative totals.
+
 ### 3) Replay Logging
 
 ```dart
@@ -133,3 +144,12 @@ Detailed policy: `/docs/serialization_and_versioning.md`.
 - Persist payloads exactly as emitted by `toMap()`.
 - Do not mutate envelope fields before persistence or transport.
 - Keep engine version and schema version in logs and diagnostics.
+
+Bonus-slot helper:
+
+- `TriPeaksState.actionableBonusSlotIndices` returns sorted indices currently
+  accepted by `UseBonusSlotAction(index)`.
+- `BonusSlotSpawnPolicy.tierRandomRank` selects low/high anchor ranks
+  deterministically (seed + spawn nonce + 1-based slot index), replay-safe.
+  Legacy session decode derives missing round seed from session seed + round
+  index using the same round-seed formula as round creation.

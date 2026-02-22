@@ -83,6 +83,7 @@ final class RoundResult {
     required this.roundNumber,
     required this.outcome,
     this.abortReason,
+    this.finalScore,
   });
 
   /// 1-based round number.
@@ -94,6 +95,11 @@ final class RoundResult {
   /// Abort reason for [RoundOutcome.aborted].
   final AbortReason? abortReason;
 
+  /// Final round score captured at completion.
+  ///
+  /// This is nullable for backward decode compatibility with older payloads.
+  final int? finalScore;
+
   /// Serializes result to JSON-friendly map.
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -102,6 +108,7 @@ final class RoundResult {
       'roundNumber': roundNumber,
       'outcome': outcome.name,
       if (abortReason case final reason?) 'abortReason': reason.name,
+      if (finalScore case final value?) 'finalScore': value,
     };
   }
 
@@ -126,9 +133,11 @@ final class RoundResult {
     final roundNumber = map['roundNumber'];
     final outcomeName = map['outcome'];
     final reasonName = map['abortReason'];
+    final finalScore = map['finalScore'];
     if (roundNumber is! int ||
         outcomeName is! String ||
-        (reasonName != null && reasonName is! String)) {
+        (reasonName != null && reasonName is! String) ||
+        (finalScore != null && finalScore is! int)) {
       return const DecodeResult.failure(
         DecodeFailure(
           code: DecodeFailureCode.invalidPayload,
@@ -143,6 +152,7 @@ final class RoundResult {
           outcome: RoundOutcome.values.byName(outcomeName),
           abortReason:
               reasonName == null ? null : AbortReason.values.byName(reasonName),
+          finalScore: finalScore as int?,
         ),
       );
     } on Object catch (error) {
