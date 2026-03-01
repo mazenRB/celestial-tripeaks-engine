@@ -15,7 +15,6 @@ final class ScoreConfig {
     this.multiplierMax = 1,
     this.timeBonusSecondsPerMove = 2,
     this.timeBonusMaxSeconds = 10,
-    this.timeBonusMultiplier = 2,
   });
 
   /// Points added when a tableau card is moved to waste.
@@ -55,9 +54,6 @@ final class ScoreConfig {
   /// Maximum seconds the time-bonus timer can hold.
   final int timeBonusMaxSeconds;
 
-  /// Multiplier applied while time-bonus timer is active.
-  final int timeBonusMultiplier;
-
   /// Serializes config to JSON-friendly map.
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -74,7 +70,6 @@ final class ScoreConfig {
       'multiplierMax': multiplierMax,
       'timeBonusSecondsPerMove': timeBonusSecondsPerMove,
       'timeBonusMaxSeconds': timeBonusMaxSeconds,
-      'timeBonusMultiplier': timeBonusMultiplier,
     };
   }
 
@@ -107,7 +102,6 @@ final class ScoreConfig {
     final multiplierMax = map['multiplierMax'];
     final timeBonusSecondsPerMove = map['timeBonusSecondsPerMove'];
     final timeBonusMaxSeconds = map['timeBonusMaxSeconds'];
-    final timeBonusMultiplier = map['timeBonusMultiplier'];
     if (a is! int ||
         b is! int ||
         c is! int ||
@@ -118,8 +112,7 @@ final class ScoreConfig {
         (multiplierStepIncrement != null && multiplierStepIncrement is! int) ||
         (multiplierMax != null && multiplierMax is! int) ||
         (timeBonusSecondsPerMove != null && timeBonusSecondsPerMove is! int) ||
-        (timeBonusMaxSeconds != null && timeBonusMaxSeconds is! int) ||
-        (timeBonusMultiplier != null && timeBonusMultiplier is! int)) {
+        (timeBonusMaxSeconds != null && timeBonusMaxSeconds is! int)) {
       return const DecodeResult.failure(
         DecodeFailure(
           code: DecodeFailureCode.invalidPayload,
@@ -153,7 +146,6 @@ final class ScoreConfig {
         multiplierMax: multiplierMax as int? ?? 1,
         timeBonusSecondsPerMove: timeBonusSecondsPerMove as int? ?? 2,
         timeBonusMaxSeconds: timeBonusMaxSeconds as int? ?? 10,
-        timeBonusMultiplier: timeBonusMultiplier as int? ?? 2,
       ),
     );
   }
@@ -891,12 +883,14 @@ final class TimeBonusTimerState {
   const TimeBonusTimerState({
     required this.remainingSeconds,
     required this.deadlineToken,
+    required this.stepCount,
   });
 
   /// Initial time-bonus timer state.
   static const TimeBonusTimerState initial = TimeBonusTimerState(
     remainingSeconds: 0,
     deadlineToken: 0,
+    stepCount: 0,
   );
 
   /// Seconds remaining on the active timer.
@@ -905,14 +899,19 @@ final class TimeBonusTimerState {
   /// Monotonic token used to validate expiry actions.
   final int deadlineToken;
 
+  /// Number of already-multiplied successful moves in the active window.
+  final int stepCount;
+
   /// Returns a copy with optional changes.
   TimeBonusTimerState copyWith({
     int? remainingSeconds,
     int? deadlineToken,
+    int? stepCount,
   }) {
     return TimeBonusTimerState(
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       deadlineToken: deadlineToken ?? this.deadlineToken,
+      stepCount: stepCount ?? this.stepCount,
     );
   }
 
@@ -923,6 +922,7 @@ final class TimeBonusTimerState {
       'type': 'time_bonus_timer_state',
       'remainingSeconds': remainingSeconds,
       'deadlineToken': deadlineToken,
+      'stepCount': stepCount,
     };
   }
 
@@ -948,7 +948,10 @@ final class TimeBonusTimerState {
     }
     final remainingSeconds = map['remainingSeconds'];
     final deadlineToken = map['deadlineToken'];
-    if (remainingSeconds is! int || deadlineToken is! int) {
+    final stepCount = map['stepCount'];
+    if (remainingSeconds is! int ||
+        deadlineToken is! int ||
+        (stepCount != null && stepCount is! int)) {
       return const DecodeResult.failure(
         DecodeFailure(
           code: DecodeFailureCode.invalidPayload,
@@ -956,10 +959,20 @@ final class TimeBonusTimerState {
         ),
       );
     }
+    final normalizedStepCount = stepCount is int ? stepCount : 0;
+    if (remainingSeconds < 0 || normalizedStepCount < 0) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'TimeBonusTimerState values must be non-negative.',
+        ),
+      );
+    }
     return DecodeResult.success(
       TimeBonusTimerState(
         remainingSeconds: remainingSeconds,
         deadlineToken: deadlineToken,
+        stepCount: normalizedStepCount,
       ),
     );
   }

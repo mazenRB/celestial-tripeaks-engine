@@ -167,7 +167,6 @@ void main() {
         multiplierMode: ScoreMultiplierMode.timeBonus,
         timeBonusSecondsPerMove: 2,
         timeBonusMaxSeconds: 10,
-        timeBonusMultiplier: 2,
         streakStepSize: 1,
         multiplierStepIncrement: 5,
         multiplierMax: 6,
@@ -199,7 +198,6 @@ void main() {
         multiplierMode: ScoreMultiplierMode.timeBonus,
         timeBonusSecondsPerMove: 2,
         timeBonusMaxSeconds: 4,
-        timeBonusMultiplier: 3,
       );
       var state = TriPeaksState.newGame(
         deck: _buildStreakUnlockDeck(),
@@ -220,8 +218,9 @@ void main() {
         const RemoveTableauCardAction(19),
         tick: 2,
       );
-      expect(r2.appliedMultiplier, 3);
+      expect(r2.appliedMultiplier, 2);
       expect(r2.state.timeBonusTimerState.remainingSeconds, 4);
+      expect(r2.state.timeBonusTimerState.stepCount, 1);
       state = r2.state;
 
       final r3 = tryReduceTriPeaks(
@@ -231,6 +230,7 @@ void main() {
       );
       expect(r3.appliedMultiplier, 3);
       expect(r3.state.timeBonusTimerState.remainingSeconds, 4);
+      expect(r3.state.timeBonusTimerState.stepCount, 2);
     });
 
     test('time bonus draw resets timer and increments token', () {
@@ -238,7 +238,6 @@ void main() {
         multiplierMode: ScoreMultiplierMode.timeBonus,
         timeBonusSecondsPerMove: 2,
         timeBonusMaxSeconds: 10,
-        timeBonusMultiplier: 2,
       );
       var state = TriPeaksState.newGame(
         deck: _buildStreakUnlockDeck(),
@@ -263,7 +262,6 @@ void main() {
         multiplierMode: ScoreMultiplierMode.timeBonus,
         timeBonusSecondsPerMove: 2,
         timeBonusMaxSeconds: 10,
-        timeBonusMultiplier: 2,
       );
       final state = TriPeaksState.newGame(
         deck: _buildStreakUnlockDeck(),
@@ -282,7 +280,6 @@ void main() {
         multiplierMode: ScoreMultiplierMode.timeBonus,
         timeBonusSecondsPerMove: 2,
         timeBonusMaxSeconds: 10,
-        timeBonusMultiplier: 2,
       );
       var state = TriPeaksState.newGame(
         deck: _buildStreakUnlockDeck(),
@@ -335,7 +332,6 @@ void main() {
         multiplierMode: ScoreMultiplierMode.timeBonus,
         timeBonusSecondsPerMove: 2,
         timeBonusMaxSeconds: 10,
-        timeBonusMultiplier: 2,
       );
       var state = TriPeaksState.newGame(
         deck: _buildStreakUnlockDeck(),
@@ -358,6 +354,28 @@ void main() {
 
       final undo = tryReduceTriPeaks(state, const UndoAction());
       expect(undo.state.timeBonusTimerState, snapshot);
+    });
+
+    test('time bonus timer invariants hold', () {
+      final config = const ScoreConfig(
+        multiplierMode: ScoreMultiplierMode.timeBonus,
+        timeBonusSecondsPerMove: 2,
+        timeBonusMaxSeconds: 10,
+      );
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: config,
+      );
+
+      state = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(18),
+      ).state;
+      state = tryReduceTriPeaks(state, const DrawFromStockAction()).state;
+
+      expect(
+          state.timeBonusTimerState.remainingSeconds, greaterThanOrEqualTo(0));
+      expect(state.timeBonusTimerState.stepCount, greaterThanOrEqualTo(0));
     });
 
     test('step multiplier uses pre-increment streak boundaries', () {
@@ -2777,7 +2795,7 @@ void main() {
 
     test('fingerprint is stable for fixed canonical state', () {
       final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), 'd97e9914');
+      expect(stateFingerprint(state), '16923606');
     });
   });
 

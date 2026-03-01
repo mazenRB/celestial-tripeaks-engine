@@ -22,7 +22,6 @@ Defaults:
 - `multiplierMax = 1`
 - `timeBonusSecondsPerMove = 2`
 - `timeBonusMaxSeconds = 10`
-- `timeBonusMultiplier = 2`
 
 Multiplier formula for successful tableau removals:
 
@@ -40,8 +39,11 @@ Time bonus multiplier mode:
   `timeBonusMaxSeconds`.
 - Timer resets on draw.
 - While `remainingSeconds > 0` before a move, base tableau points are
-  multiplied by `timeBonusMultiplier`.
+  multiplied by a progressive multiplier (x2, x3, x4, ...).
 - The first move after timer hits 0 is not multiplied (pre-move rule).
+- `stepCount` tracks already-multiplied moves in the active window.
+- Multiplier formula when `remainingSeconds > 0` before a move:
+  `multiplier = 2 + stepCount` then `stepCount++`.
 - Host must dispatch `TimeBonusExpiredAction` and should schedule at most one
   expiry per `deadlineToken`.
 - Expiry is rejected when `remainingSeconds == 0` (not armed) or when the

@@ -67,6 +67,7 @@ Time bonus timer:
   timer.
 - Host should schedule at most one expiry per token; resets/increments
   invalidate old tokens deterministically.
+- `stepCount` tracks already-multiplied moves in the current active window.
 
 Score breakdown:
 

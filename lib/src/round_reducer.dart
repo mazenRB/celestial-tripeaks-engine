@@ -214,7 +214,14 @@ TriPeaksReduceResult tryReduceTriPeaks(
         nextRemoved,
         state.clearedPeaksAwardedMask,
       );
-      final appliedMultiplier = _computeActiveMultiplier(state);
+      final preTimeRemaining = state.timeBonusTimerState.remainingSeconds;
+      final preTimeStepCount = state.timeBonusTimerState.stepCount;
+      final appliedMultiplier = _computeActiveMultiplier(
+        state.scoreConfig,
+        preTimeRemaining,
+        preTimeStepCount,
+        state.streakState.currentStreak,
+      );
       final tableauBasePoints = state.scoreConfig.pointsTableauToWaste;
       final multiplierExtraPoints = tableauBasePoints * (appliedMultiplier - 1);
       final peakBonusPoints =
@@ -235,9 +242,11 @@ TriPeaksReduceResult tryReduceTriPeaks(
         state.streakConfig,
         effectiveTick,
       );
+      final nextStepCount = preTimeRemaining > 0 ? preTimeStepCount + 1 : 0;
       final nextTimeBonus = _onTimeBonusAdvanced(
         state.timeBonusTimerState,
         state.scoreConfig,
+        nextStepCount: nextStepCount,
       );
       final nextStrikeTimer = _onStreakAdvancedStrikeTimer(
         state.strikeTimerState,
@@ -383,26 +392,32 @@ int _computeAppliedMultiplier(int currentStreak, ScoreConfig config) {
   return capped < 1 ? 1 : capped;
 }
 
-int _computeActiveMultiplier(TriPeaksState state) {
-  if (state.scoreConfig.multiplierMode == ScoreMultiplierMode.timeBonus) {
-    if (state.timeBonusTimerState.remainingSeconds <= 0) {
+int _computeActiveMultiplier(
+  ScoreConfig config,
+  int preRemainingSeconds,
+  int preStepCount,
+  int preStreak,
+) {
+  if (config.multiplierMode == ScoreMultiplierMode.timeBonus) {
+    if (preRemainingSeconds <= 0) {
       return 1;
     }
-    final raw = state.scoreConfig.timeBonusMultiplier;
+    final raw = 2 + preStepCount;
     return raw < 1 ? 1 : raw;
   }
-  final preStreak = state.streakState.currentStreak;
-  return _computeAppliedMultiplier(preStreak, state.scoreConfig);
+  return _computeAppliedMultiplier(preStreak, config);
 }
 
 TimeBonusTimerState _onTimeBonusAdvanced(
   TimeBonusTimerState state,
-  ScoreConfig config,
-) {
+  ScoreConfig config, {
+  required int nextStepCount,
+}) {
   if (config.multiplierMode != ScoreMultiplierMode.timeBonus) {
     return state;
   }
-  final added = config.timeBonusSecondsPerMove;
+  final added =
+      config.timeBonusSecondsPerMove < 0 ? 0 : config.timeBonusSecondsPerMove;
   final maxSeconds =
       config.timeBonusMaxSeconds < 0 ? 0 : config.timeBonusMaxSeconds;
   final nextSeconds = min(maxSeconds, state.remainingSeconds + added);
@@ -411,6 +426,7 @@ TimeBonusTimerState _onTimeBonusAdvanced(
     remainingSeconds: nextSeconds,
     deadlineToken:
         needsNewToken ? state.deadlineToken + 1 : state.deadlineToken,
+    stepCount: nextStepCount < 0 ? 0 : nextStepCount,
   );
 }
 
@@ -422,11 +438,15 @@ TimeBonusTimerState _onTimeBonusResetOnDraw(
     return state;
   }
   if (state.remainingSeconds == 0) {
-    return state;
+    if (state.stepCount == 0) {
+      return state;
+    }
+    return state.copyWith(stepCount: 0);
   }
   return state.copyWith(
     remainingSeconds: 0,
     deadlineToken: state.deadlineToken + 1,
+    stepCount: 0,
   );
 }
 
@@ -437,7 +457,7 @@ TimeBonusTimerState _onTimeBonusExpired(
   if (config.multiplierMode != ScoreMultiplierMode.timeBonus) {
     return state;
   }
-  return state.copyWith(remainingSeconds: 0);
+  return state.copyWith(remainingSeconds: 0, stepCount: 0);
 }
 
 ScoreDeltaBreakdown _buildDrawBreakdown(int drawPoints) {
