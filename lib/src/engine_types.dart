@@ -12,6 +12,9 @@ enum TriPeaksErrorCode {
   strikeTimerDisabled,
   strikeTimerNotArmed,
   staleStrikeTimerExpiry,
+  timeBonusTimerDisabled,
+  timeBonusTimerNotArmed,
+  staleTimeBonusExpiry,
 }
 
 /// Error codes for hint query failures.
@@ -382,6 +385,18 @@ final class UseBonusSlotAction extends TriPeaksAction {
 final class StrikeTimerExpiredAction extends TriPeaksAction {
   /// Creates a strike-expiry action.
   const StrikeTimerExpiredAction({required this.deadlineToken});
+
+  /// The deadline token expected by the sender.
+  final int deadlineToken;
+
+  /// Serializes action to JSON-friendly map.
+  Map<String, dynamic> toMap() => roundActionToMap(this);
+}
+
+/// Action that requests time-bonus expiry processing for [deadlineToken].
+final class TimeBonusExpiredAction extends TriPeaksAction {
+  /// Creates a time-bonus expiry action.
+  const TimeBonusExpiredAction({required this.deadlineToken});
 
   /// The deadline token expected by the sender.
   final int deadlineToken;

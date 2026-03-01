@@ -9,9 +9,13 @@ final class ScoreConfig {
     this.penaltyInvalidAction = 0,
     this.pointsPeakCleared = 0,
     this.pointsPerRemainingStockCardOnWin = 0,
+    this.multiplierMode = ScoreMultiplierMode.streak,
     this.streakStepSize = 999999,
     this.multiplierStepIncrement = 0,
     this.multiplierMax = 1,
+    this.timeBonusSecondsPerMove = 2,
+    this.timeBonusMaxSeconds = 10,
+    this.timeBonusMultiplier = 2,
   });
 
   /// Points added when a tableau card is moved to waste.
@@ -31,6 +35,9 @@ final class ScoreConfig {
   /// Bonus points awarded per remaining stock card when a round is won.
   final int pointsPerRemainingStockCardOnWin;
 
+  /// Selects which multiplier system is active for scoring.
+  final ScoreMultiplierMode multiplierMode;
+
   /// Number of streak points required to advance one multiplier step.
   ///
   /// Large values effectively disable step-based multiplier growth.
@@ -42,6 +49,15 @@ final class ScoreConfig {
   /// Maximum multiplier value.
   final int multiplierMax;
 
+  /// Seconds added per valid tableau move in time-bonus mode.
+  final int timeBonusSecondsPerMove;
+
+  /// Maximum seconds the time-bonus timer can hold.
+  final int timeBonusMaxSeconds;
+
+  /// Multiplier applied while time-bonus timer is active.
+  final int timeBonusMultiplier;
+
   /// Serializes config to JSON-friendly map.
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -52,9 +68,13 @@ final class ScoreConfig {
       'penaltyInvalidAction': penaltyInvalidAction,
       'pointsPeakCleared': pointsPeakCleared,
       'pointsPerRemainingStockCardOnWin': pointsPerRemainingStockCardOnWin,
+      'multiplierMode': multiplierMode.name,
       'streakStepSize': streakStepSize,
       'multiplierStepIncrement': multiplierStepIncrement,
       'multiplierMax': multiplierMax,
+      'timeBonusSecondsPerMove': timeBonusSecondsPerMove,
+      'timeBonusMaxSeconds': timeBonusMaxSeconds,
+      'timeBonusMultiplier': timeBonusMultiplier,
     };
   }
 
@@ -81,23 +101,44 @@ final class ScoreConfig {
     final c = map['penaltyInvalidAction'];
     final d = map['pointsPeakCleared'];
     final remainingStockBonus = map['pointsPerRemainingStockCardOnWin'];
+    final multiplierMode = map['multiplierMode'];
     final streakStepSize = map['streakStepSize'];
     final multiplierStepIncrement = map['multiplierStepIncrement'];
     final multiplierMax = map['multiplierMax'];
+    final timeBonusSecondsPerMove = map['timeBonusSecondsPerMove'];
+    final timeBonusMaxSeconds = map['timeBonusMaxSeconds'];
+    final timeBonusMultiplier = map['timeBonusMultiplier'];
     if (a is! int ||
         b is! int ||
         c is! int ||
         d is! int ||
         (remainingStockBonus != null && remainingStockBonus is! int) ||
+        (multiplierMode != null && multiplierMode is! String) ||
         (streakStepSize != null && streakStepSize is! int) ||
         (multiplierStepIncrement != null && multiplierStepIncrement is! int) ||
-        (multiplierMax != null && multiplierMax is! int)) {
+        (multiplierMax != null && multiplierMax is! int) ||
+        (timeBonusSecondsPerMove != null && timeBonusSecondsPerMove is! int) ||
+        (timeBonusMaxSeconds != null && timeBonusMaxSeconds is! int) ||
+        (timeBonusMultiplier != null && timeBonusMultiplier is! int)) {
       return const DecodeResult.failure(
         DecodeFailure(
           code: DecodeFailureCode.invalidPayload,
           message: 'Invalid ScoreConfig payload.',
         ),
       );
+    }
+    ScoreMultiplierMode resolvedMode = ScoreMultiplierMode.streak;
+    if (multiplierMode case final modeName?) {
+      try {
+        resolvedMode = ScoreMultiplierMode.values.byName(modeName);
+      } on Object catch (error) {
+        return DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'Invalid multiplierMode: $error',
+          ),
+        );
+      }
     }
     return DecodeResult.success(
       ScoreConfig(
@@ -106,12 +147,22 @@ final class ScoreConfig {
         penaltyInvalidAction: c,
         pointsPeakCleared: d,
         pointsPerRemainingStockCardOnWin: remainingStockBonus as int? ?? 0,
+        multiplierMode: resolvedMode,
         streakStepSize: streakStepSize as int? ?? 999999,
         multiplierStepIncrement: multiplierStepIncrement as int? ?? 0,
         multiplierMax: multiplierMax as int? ?? 1,
+        timeBonusSecondsPerMove: timeBonusSecondsPerMove as int? ?? 2,
+        timeBonusMaxSeconds: timeBonusMaxSeconds as int? ?? 10,
+        timeBonusMultiplier: timeBonusMultiplier as int? ?? 2,
       ),
     );
   }
+}
+
+/// Selects which multiplier system is active for scoring.
+enum ScoreMultiplierMode {
+  streak,
+  timeBonus,
 }
 
 /// Component-level explanation for one applied score delta.
@@ -828,6 +879,86 @@ final class StrikeTimerState {
     return DecodeResult.success(
       StrikeTimerState(
         isArmed: isArmed,
+        deadlineToken: deadlineToken,
+      ),
+    );
+  }
+}
+
+/// Runtime time-bonus timer state for one round.
+final class TimeBonusTimerState {
+  /// Creates time-bonus timer state.
+  const TimeBonusTimerState({
+    required this.remainingSeconds,
+    required this.deadlineToken,
+  });
+
+  /// Initial time-bonus timer state.
+  static const TimeBonusTimerState initial = TimeBonusTimerState(
+    remainingSeconds: 0,
+    deadlineToken: 0,
+  );
+
+  /// Seconds remaining on the active timer.
+  final int remainingSeconds;
+
+  /// Monotonic token used to validate expiry actions.
+  final int deadlineToken;
+
+  /// Returns a copy with optional changes.
+  TimeBonusTimerState copyWith({
+    int? remainingSeconds,
+    int? deadlineToken,
+  }) {
+    return TimeBonusTimerState(
+      remainingSeconds: remainingSeconds ?? this.remainingSeconds,
+      deadlineToken: deadlineToken ?? this.deadlineToken,
+    );
+  }
+
+  /// Serializes state to JSON-friendly map.
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      'schemaVersion': _serializationSchemaV1,
+      'type': 'time_bonus_timer_state',
+      'remainingSeconds': remainingSeconds,
+      'deadlineToken': deadlineToken,
+    };
+  }
+
+  /// Decodes state from map without throwing.
+  static DecodeResult<TimeBonusTimerState> tryFromMap(
+    Map<String, dynamic> map,
+  ) {
+    if (map['schemaVersion'] != _serializationSchemaV1) {
+      return DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.unsupportedSchemaVersion,
+          message: 'Unsupported schemaVersion ${map['schemaVersion']}.',
+        ),
+      );
+    }
+    if (map['type'] != 'time_bonus_timer_state') {
+      return DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.unknownType,
+          message: 'Unknown type ${map['type']}.',
+        ),
+      );
+    }
+    final remainingSeconds = map['remainingSeconds'];
+    final deadlineToken = map['deadlineToken'];
+    if (remainingSeconds is! int || deadlineToken is! int) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'Invalid TimeBonusTimerState payload.',
+        ),
+      );
+    }
+    return DecodeResult.success(
+      TimeBonusTimerState(
+        remainingSeconds: remainingSeconds,
         deadlineToken: deadlineToken,
       ),
     );

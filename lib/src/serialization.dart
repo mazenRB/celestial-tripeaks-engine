@@ -278,6 +278,13 @@ Map<String, dynamic> roundActionToMap(TriPeaksAction action) {
         'actionType': 'strike_timer_expired',
         'deadlineToken': deadlineToken,
       };
+    case TimeBonusExpiredAction(deadlineToken: final deadlineToken):
+      return <String, dynamic>{
+        'schemaVersion': _serializationSchemaV1,
+        'type': 'tripeaks_round_action',
+        'actionType': 'time_bonus_expired',
+        'deadlineToken': deadlineToken,
+      };
   }
 }
 
@@ -354,6 +361,19 @@ DecodeResult<TriPeaksAction> tryDecodeRoundAction(Map<String, dynamic> json) {
       }
       return DecodeResult.success(
         StrikeTimerExpiredAction(deadlineToken: deadlineToken),
+      );
+    case 'time_bonus_expired':
+      final deadlineToken = json['deadlineToken'];
+      if (deadlineToken is! int) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'time_bonus_expired requires int deadlineToken.',
+          ),
+        );
+      }
+      return DecodeResult.success(
+        TimeBonusExpiredAction(deadlineToken: deadlineToken),
       );
     default:
       return DecodeResult.failure(

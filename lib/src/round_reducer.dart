@@ -29,6 +29,9 @@ TriPeaksState reduceTriPeaks(
       case TriPeaksErrorCode.strikeTimerDisabled:
       case TriPeaksErrorCode.strikeTimerNotArmed:
       case TriPeaksErrorCode.staleStrikeTimerExpiry:
+      case TriPeaksErrorCode.timeBonusTimerDisabled:
+      case TriPeaksErrorCode.timeBonusTimerNotArmed:
+      case TriPeaksErrorCode.staleTimeBonusExpiry:
         throw StateError(error.message);
     }
   }
@@ -52,7 +55,10 @@ TriPeaksReduceResult tryReduceTriPeaks(
         error.code == TriPeaksErrorCode.nothingToUndo ||
         error.code == TriPeaksErrorCode.strikeTimerDisabled ||
         error.code == TriPeaksErrorCode.strikeTimerNotArmed ||
-        error.code == TriPeaksErrorCode.staleStrikeTimerExpiry) {
+        error.code == TriPeaksErrorCode.staleStrikeTimerExpiry ||
+        error.code == TriPeaksErrorCode.timeBonusTimerDisabled ||
+        error.code == TriPeaksErrorCode.timeBonusTimerNotArmed ||
+        error.code == TriPeaksErrorCode.staleTimeBonusExpiry) {
       return TriPeaksReduceResult(
         state: preprocessed,
         scoreDelta: 0,
@@ -151,6 +157,10 @@ TriPeaksReduceResult tryReduceTriPeaks(
 }) {
   switch (action) {
     case DrawFromStockAction(targetSlot: final targetSlot):
+      final nextTimeBonus = _onTimeBonusResetOnDraw(
+        state.timeBonusTimerState,
+        state.scoreConfig,
+      );
       final delta = state.scoreConfig.pointsDrawFromStock;
       final breakdown = _buildDrawBreakdown(delta);
       final nextHistory = _pushUndoSnapshot(state);
@@ -184,6 +194,7 @@ TriPeaksReduceResult tryReduceTriPeaks(
           ),
           streakState: nextStreak,
           strikeTimerState: nextStrikeTimer,
+          timeBonusTimerState: nextTimeBonus,
           bonusSlotsState: nextBonusSlotsState,
           undoHistory: nextHistory,
         ),
@@ -203,11 +214,7 @@ TriPeaksReduceResult tryReduceTriPeaks(
         nextRemoved,
         state.clearedPeaksAwardedMask,
       );
-      final preStreak = state.streakState.currentStreak;
-      final appliedMultiplier = _computeAppliedMultiplier(
-        preStreak,
-        state.scoreConfig,
-      );
+      final appliedMultiplier = _computeActiveMultiplier(state);
       final tableauBasePoints = state.scoreConfig.pointsTableauToWaste;
       final multiplierExtraPoints = tableauBasePoints * (appliedMultiplier - 1);
       final peakBonusPoints =
@@ -227,6 +234,10 @@ TriPeaksReduceResult tryReduceTriPeaks(
         state.streakState,
         state.streakConfig,
         effectiveTick,
+      );
+      final nextTimeBonus = _onTimeBonusAdvanced(
+        state.timeBonusTimerState,
+        state.scoreConfig,
       );
       final nextStrikeTimer = _onStreakAdvancedStrikeTimer(
         state.strikeTimerState,
@@ -261,6 +272,7 @@ TriPeaksReduceResult tryReduceTriPeaks(
           ),
           streakState: nextStreak,
           strikeTimerState: nextStrikeTimer,
+          timeBonusTimerState: nextTimeBonus,
           bonusSlotsState: spawnResult.bonusSlotsState,
           lastSuccessfulTableauRank: state.tableau[index].rank,
           clearedPeaksAwardedMask: peakBonus.nextAwardedMask,
@@ -294,6 +306,15 @@ TriPeaksReduceResult tryReduceTriPeaks(
 
     case StrikeTimerExpiredAction():
       final nextHistory = _pushUndoSnapshot(state);
+      if (state.scoreConfig.multiplierMode == ScoreMultiplierMode.timeBonus) {
+        const breakdown = ScoreDeltaBreakdown.zero;
+        return (
+          state: state._copyWith(undoHistory: nextHistory),
+          scoreDelta: 0,
+          scoreBreakdown: breakdown,
+          appliedMultiplier: 1,
+        );
+      }
       final endedStreak = state.streakState.copyWith(currentStreak: 0);
       final nextStrikeTimer = _onStreakEndedStrikeTimer(
         state.strikeTimerState,
@@ -329,6 +350,27 @@ TriPeaksReduceResult tryReduceTriPeaks(
         scoreBreakdown: restored.scoreState.lastBreakdown,
         appliedMultiplier: restored.scoreState.currentMultiplier,
       );
+
+    case TimeBonusExpiredAction():
+      final nextHistory = _pushUndoSnapshot(state);
+      final nextTimeBonus = _onTimeBonusExpired(
+        state.timeBonusTimerState,
+        state.scoreConfig,
+      );
+      const breakdown = ScoreDeltaBreakdown.zero;
+      return (
+        state: state._copyWith(
+          scoreState: state.scoreState.withNoScoreChange(
+            appliedMultiplier: 1,
+            breakdown: breakdown,
+          ),
+          timeBonusTimerState: nextTimeBonus,
+          undoHistory: nextHistory,
+        ),
+        scoreDelta: 0,
+        scoreBreakdown: breakdown,
+        appliedMultiplier: 1,
+      );
   }
 }
 
@@ -339,6 +381,63 @@ int _computeAppliedMultiplier(int currentStreak, ScoreConfig config) {
   final raw = 1 + (steps * config.multiplierStepIncrement);
   final capped = min(raw, normalizedMax);
   return capped < 1 ? 1 : capped;
+}
+
+int _computeActiveMultiplier(TriPeaksState state) {
+  if (state.scoreConfig.multiplierMode == ScoreMultiplierMode.timeBonus) {
+    if (state.timeBonusTimerState.remainingSeconds <= 0) {
+      return 1;
+    }
+    final raw = state.scoreConfig.timeBonusMultiplier;
+    return raw < 1 ? 1 : raw;
+  }
+  final preStreak = state.streakState.currentStreak;
+  return _computeAppliedMultiplier(preStreak, state.scoreConfig);
+}
+
+TimeBonusTimerState _onTimeBonusAdvanced(
+  TimeBonusTimerState state,
+  ScoreConfig config,
+) {
+  if (config.multiplierMode != ScoreMultiplierMode.timeBonus) {
+    return state;
+  }
+  final added = config.timeBonusSecondsPerMove;
+  final maxSeconds =
+      config.timeBonusMaxSeconds < 0 ? 0 : config.timeBonusMaxSeconds;
+  final nextSeconds = min(maxSeconds, state.remainingSeconds + added);
+  final needsNewToken = state.remainingSeconds == 0 && nextSeconds > 0;
+  return state.copyWith(
+    remainingSeconds: nextSeconds,
+    deadlineToken:
+        needsNewToken ? state.deadlineToken + 1 : state.deadlineToken,
+  );
+}
+
+TimeBonusTimerState _onTimeBonusResetOnDraw(
+  TimeBonusTimerState state,
+  ScoreConfig config,
+) {
+  if (config.multiplierMode != ScoreMultiplierMode.timeBonus) {
+    return state;
+  }
+  if (state.remainingSeconds == 0) {
+    return state;
+  }
+  return state.copyWith(
+    remainingSeconds: 0,
+    deadlineToken: state.deadlineToken + 1,
+  );
+}
+
+TimeBonusTimerState _onTimeBonusExpired(
+  TimeBonusTimerState state,
+  ScoreConfig config,
+) {
+  if (config.multiplierMode != ScoreMultiplierMode.timeBonus) {
+    return state;
+  }
+  return state.copyWith(remainingSeconds: 0);
 }
 
 ScoreDeltaBreakdown _buildDrawBreakdown(int drawPoints) {

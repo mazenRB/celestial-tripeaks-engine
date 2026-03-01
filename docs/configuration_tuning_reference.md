@@ -16,9 +16,13 @@ Defaults:
 - `penaltyInvalidAction = 0`
 - `pointsPeakCleared = 0`
 - `pointsPerRemainingStockCardOnWin = 0`
+- `multiplierMode = streak`
 - `streakStepSize = 999999`
 - `multiplierStepIncrement = 0`
 - `multiplierMax = 1`
+- `timeBonusSecondsPerMove = 2`
+- `timeBonusMaxSeconds = 10`
+- `timeBonusMultiplier = 2`
 
 Multiplier formula for successful tableau removals:
 
@@ -28,6 +32,20 @@ Multiplier formula for successful tableau removals:
 
 In PR1, multiplier applies only to tableau base points. Draw points and peak
 bonus points are not multiplied.
+
+Time bonus multiplier mode:
+
+- Set `multiplierMode = timeBonus`.
+- Timer adds `timeBonusSecondsPerMove` on each valid tableau removal, capped by
+  `timeBonusMaxSeconds`.
+- Timer resets on draw.
+- While `remainingSeconds > 0` before a move, base tableau points are
+  multiplied by `timeBonusMultiplier`.
+- The first move after timer hits 0 is not multiplied (pre-move rule).
+- Host must dispatch `TimeBonusExpiredAction` and should schedule at most one
+  expiry per `deadlineToken`.
+- Expiry is rejected when `remainingSeconds == 0` (not armed) or when the
+  deadline token is stale.
 
 Risk notes:
 

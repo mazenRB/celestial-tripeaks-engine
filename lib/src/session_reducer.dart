@@ -270,6 +270,12 @@ TriPeaksRuleError? _validateAction(TriPeaksState state, TriPeaksAction action) {
       return null;
 
     case StrikeTimerExpiredAction(deadlineToken: final deadlineToken):
+      if (state.scoreConfig.multiplierMode == ScoreMultiplierMode.timeBonus) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.strikeTimerDisabled,
+          message: 'Strike timer is disabled for this round.',
+        );
+      }
       if (!state.strikeTimerConfig.enabled) {
         return const TriPeaksRuleError(
           code: TriPeaksErrorCode.strikeTimerDisabled,
@@ -290,6 +296,28 @@ TriPeaksRuleError? _validateAction(TriPeaksState state, TriPeaksAction action) {
         );
       }
       return null;
+
+    case TimeBonusExpiredAction(deadlineToken: final deadlineToken):
+      if (state.scoreConfig.multiplierMode != ScoreMultiplierMode.timeBonus) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.timeBonusTimerDisabled,
+          message: 'Time bonus timer is disabled.',
+        );
+      }
+      if (state.timeBonusTimerState.remainingSeconds == 0) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.timeBonusTimerNotArmed,
+          message: 'Time bonus timer is not armed.',
+        );
+      }
+      if (deadlineToken != state.timeBonusTimerState.deadlineToken) {
+        return TriPeaksRuleError(
+          code: TriPeaksErrorCode.staleTimeBonusExpiry,
+          message: 'Stale time bonus expiry token $deadlineToken (expected '
+              '${state.timeBonusTimerState.deadlineToken}).',
+        );
+      }
+      return null;
   }
 }
 
@@ -302,6 +330,7 @@ final class _TriPeaksSnapshot {
     required this.scoreState,
     required this.streakState,
     required this.strikeTimerState,
+    required this.timeBonusTimerState,
     required this.bonusSlotsState,
     required this.lastSuccessfulTableauRank,
     required this.clearedPeaksAwardedMask,
@@ -315,6 +344,7 @@ final class _TriPeaksSnapshot {
   final ScoreState scoreState;
   final StreakState streakState;
   final StrikeTimerState strikeTimerState;
+  final TimeBonusTimerState timeBonusTimerState;
   final BonusSlotsState bonusSlotsState;
   final Rank? lastSuccessfulTableauRank;
   final int clearedPeaksAwardedMask;
@@ -331,6 +361,7 @@ final class _TriPeaksSnapshot {
       'scoreState': scoreState.toMap(),
       'streakState': streakState.toMap(),
       'strikeTimerState': strikeTimerState.toMap(),
+      'timeBonusTimerState': timeBonusTimerState.toMap(),
       'bonusSlotsState': bonusSlotsState.toMap(),
       if (lastSuccessfulTableauRank case final rank?)
         'lastSuccessfulTableauRank': rank.name,
@@ -403,6 +434,24 @@ final class _TriPeaksSnapshot {
     if (!strikeTimerResult.isSuccess) {
       return DecodeResult.failure(strikeTimerResult.error!);
     }
+    final timeBonusTimerStateMap = map['timeBonusTimerState'];
+    DecodeResult<TimeBonusTimerState>? timeBonusTimerResult;
+    if (timeBonusTimerStateMap != null) {
+      if (timeBonusTimerStateMap is! Map<String, dynamic>) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'timeBonusTimerState must be a map when present.',
+          ),
+        );
+      }
+      timeBonusTimerResult = TimeBonusTimerState.tryFromMap(
+        timeBonusTimerStateMap,
+      );
+      if (!timeBonusTimerResult.isSuccess) {
+        return DecodeResult.failure(timeBonusTimerResult.error!);
+      }
+    }
     final bonusSlotsStateMap = map['bonusSlotsState'];
     if (bonusSlotsStateMap is! Map<String, dynamic>) {
       return const DecodeResult.failure(
@@ -460,6 +509,8 @@ final class _TriPeaksSnapshot {
         scoreState: scoreResult.value!,
         streakState: streakResult.value!,
         strikeTimerState: strikeTimerResult.value!,
+        timeBonusTimerState:
+            timeBonusTimerResult?.value ?? TimeBonusTimerState.initial,
         bonusSlotsState: bonusSlotsResult.value!,
         lastSuccessfulTableauRank: decodedLastSuccessfulTableauRank,
         clearedPeaksAwardedMask: clearedPeaksAwardedMask,

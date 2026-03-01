@@ -51,6 +51,7 @@ final class TriPeaksState {
       scoreState: ScoreState.initial,
       streakState: StreakState.initial,
       strikeTimerState: StrikeTimerState.initial,
+      timeBonusTimerState: TimeBonusTimerState.initial,
       bonusSlotsState: initialBonusSlots,
       lastSuccessfulTableauRank: null,
       clearedPeaksAwardedMask: 0,
@@ -74,6 +75,7 @@ final class TriPeaksState {
     required this.scoreState,
     required this.streakState,
     required this.strikeTimerState,
+    required this.timeBonusTimerState,
     required this.bonusSlotsState,
     required this.lastSuccessfulTableauRank,
     required this.clearedPeaksAwardedMask,
@@ -160,6 +162,9 @@ final class TriPeaksState {
 
   /// Current strike timer snapshot.
   final StrikeTimerState strikeTimerState;
+
+  /// Current time-bonus timer snapshot.
+  final TimeBonusTimerState timeBonusTimerState;
 
   /// Current bonus-slots snapshot.
   final BonusSlotsState bonusSlotsState;
@@ -350,6 +355,7 @@ final class TriPeaksState {
     StreakState? streakState,
     BonusSlotsState? bonusSlotsState,
     StrikeTimerState? strikeTimerState,
+    TimeBonusTimerState? timeBonusTimerState,
     Rank? lastSuccessfulTableauRank,
     bool clearLastSuccessfulTableauRank = false,
     int? clearedPeaksAwardedMask,
@@ -374,6 +380,7 @@ final class TriPeaksState {
       scoreState: scoreState ?? this.scoreState,
       streakState: streakState ?? this.streakState,
       strikeTimerState: strikeTimerState ?? this.strikeTimerState,
+      timeBonusTimerState: timeBonusTimerState ?? this.timeBonusTimerState,
       bonusSlotsState: bonusSlotsState ?? this.bonusSlotsState,
       lastSuccessfulTableauRank: clearLastSuccessfulTableauRank
           ? null
@@ -395,6 +402,7 @@ final class TriPeaksState {
       scoreState: scoreState,
       streakState: streakState,
       strikeTimerState: strikeTimerState,
+      timeBonusTimerState: timeBonusTimerState,
       bonusSlotsState: bonusSlotsState,
       lastSuccessfulTableauRank: lastSuccessfulTableauRank,
       clearedPeaksAwardedMask: clearedPeaksAwardedMask,
@@ -411,6 +419,7 @@ final class TriPeaksState {
       scoreState: snapshot.scoreState,
       streakState: snapshot.streakState,
       strikeTimerState: snapshot.strikeTimerState,
+      timeBonusTimerState: snapshot.timeBonusTimerState,
       bonusSlotsState: snapshot.bonusSlotsState,
       lastSuccessfulTableauRank: snapshot.lastSuccessfulTableauRank,
       clearedPeaksAwardedMask: snapshot.clearedPeaksAwardedMask,
@@ -472,6 +481,7 @@ final class TriPeaksState {
       'scoreState': scoreState.toMap(),
       'streakState': streakState.toMap(),
       'strikeTimerState': strikeTimerState.toMap(),
+      'timeBonusTimerState': timeBonusTimerState.toMap(),
       'bonusSlotsState': bonusSlotsState.toMap(),
       if (lastSuccessfulTableauRank case final rank?)
         'lastSuccessfulTableauRank': rank.name,
@@ -668,6 +678,24 @@ final class TriPeaksState {
     if (!strikeTimerStateResult.isSuccess) {
       return DecodeResult.failure(strikeTimerStateResult.error!);
     }
+    final timeBonusTimerStateMap = map['timeBonusTimerState'];
+    DecodeResult<TimeBonusTimerState>? timeBonusTimerStateResult;
+    if (timeBonusTimerStateMap != null) {
+      if (timeBonusTimerStateMap is! Map<String, dynamic>) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message: 'timeBonusTimerState must be a map when present.',
+          ),
+        );
+      }
+      timeBonusTimerStateResult = TimeBonusTimerState.tryFromMap(
+        timeBonusTimerStateMap,
+      );
+      if (!timeBonusTimerStateResult.isSuccess) {
+        return DecodeResult.failure(timeBonusTimerStateResult.error!);
+      }
+    }
     final lastSuccessfulTableauRank = map['lastSuccessfulTableauRank'];
     if (lastSuccessfulTableauRank != null &&
         lastSuccessfulTableauRank is! String) {
@@ -774,6 +802,8 @@ final class TriPeaksState {
         scoreState: scoreStateResult.value!,
         streakState: streakStateResult.value!,
         strikeTimerState: strikeTimerStateResult.value!,
+        timeBonusTimerState:
+            timeBonusTimerStateResult?.value ?? TimeBonusTimerState.initial,
         bonusSlotsState: normalizedBonusSlots,
         lastSuccessfulTableauRank: decodedLastSuccessfulTableauRank,
         clearedPeaksAwardedMask: clearedPeaksAwardedMask as int? ?? 0,

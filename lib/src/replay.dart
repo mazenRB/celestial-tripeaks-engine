@@ -309,6 +309,9 @@ enum ReplayFailureReason {
   strikeTimerDisabled,
   strikeTimerNotArmed,
   staleStrikeTimerExpiry,
+  timeBonusTimerDisabled,
+  timeBonusTimerNotArmed,
+  staleTimeBonusExpiry,
 }
 
 /// Session action descriptor for replay serialization.
@@ -352,6 +355,11 @@ final class ReplayActionDto {
           case StrikeTimerExpiredAction(deadlineToken: final deadlineToken):
             return ReplayActionDto(
               kind: ReplayActionKind.strikeTimerExpired,
+              deadlineToken: deadlineToken,
+            );
+          case TimeBonusExpiredAction(deadlineToken: final deadlineToken):
+            return ReplayActionDto(
+              kind: ReplayActionKind.timeBonusExpired,
               deadlineToken: deadlineToken,
             );
         }
@@ -487,6 +495,12 @@ final class ReplayActionDto {
           throw StateError('deadlineToken is required for strikeTimerExpired.');
         }
         return PlayRoundAction(StrikeTimerExpiredAction(deadlineToken: token));
+      case ReplayActionKind.timeBonusExpired:
+        final token = deadlineToken;
+        if (token == null) {
+          throw StateError('deadlineToken is required for timeBonusExpired.');
+        }
+        return PlayRoundAction(TimeBonusExpiredAction(deadlineToken: token));
       case ReplayActionKind.startNextRound:
         return const StartNextRoundAction();
       case ReplayActionKind.abortRound:
@@ -502,6 +516,7 @@ enum ReplayActionKind {
   undo,
   useBonusSlot,
   strikeTimerExpired,
+  timeBonusExpired,
   startNextRound,
   abortRound,
 }
@@ -745,6 +760,9 @@ bool _isAcceptedResult(TriPeaksSessionReduceResult result) {
       case TriPeaksErrorCode.strikeTimerDisabled:
       case TriPeaksErrorCode.strikeTimerNotArmed:
       case TriPeaksErrorCode.staleStrikeTimerExpiry:
+      case TriPeaksErrorCode.timeBonusTimerDisabled:
+      case TriPeaksErrorCode.timeBonusTimerNotArmed:
+      case TriPeaksErrorCode.staleTimeBonusExpiry:
         return false;
     }
   }
@@ -776,6 +794,12 @@ ReplayFailureReason _mapFailureReason(TriPeaksSessionReduceResult result) {
         return ReplayFailureReason.strikeTimerNotArmed;
       case TriPeaksErrorCode.staleStrikeTimerExpiry:
         return ReplayFailureReason.staleStrikeTimerExpiry;
+      case TriPeaksErrorCode.timeBonusTimerDisabled:
+        return ReplayFailureReason.timeBonusTimerDisabled;
+      case TriPeaksErrorCode.timeBonusTimerNotArmed:
+        return ReplayFailureReason.timeBonusTimerNotArmed;
+      case TriPeaksErrorCode.staleTimeBonusExpiry:
+        return ReplayFailureReason.staleTimeBonusExpiry;
       case TriPeaksErrorCode.invalidTableauIndex:
       case TriPeaksErrorCode.tableauCardNotRemovable:
       case TriPeaksErrorCode.emptyStock:

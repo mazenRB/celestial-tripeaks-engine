@@ -59,6 +59,15 @@ final next = reduceTriPeaks(state, const DrawFromStockAction());
 
 Use `tryReduceTriPeaks` when you need typed error handling without throws.
 
+Time bonus timer:
+
+- `TriPeaksState.timeBonusTimerState` holds remaining seconds and deadline
+  token.
+- Host dispatches `TimeBonusExpiredAction(deadlineToken: ...)` to expire the
+  timer.
+- Host should schedule at most one expiry per token; resets/increments
+  invalidate old tokens deterministically.
+
 Score breakdown:
 
 - `tableauBasePoints`
