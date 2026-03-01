@@ -8,6 +8,7 @@ final class ScoreConfig {
     this.pointsDrawFromStock = 0,
     this.penaltyInvalidAction = 0,
     this.pointsPeakCleared = 0,
+    this.pointsPerRemainingStockCardOnWin = 0,
     this.streakStepSize = 999999,
     this.multiplierStepIncrement = 0,
     this.multiplierMax = 1,
@@ -26,6 +27,9 @@ final class ScoreConfig {
 
   /// Points awarded once when a peak is fully cleared.
   final int pointsPeakCleared;
+
+  /// Bonus points awarded per remaining stock card when a round is won.
+  final int pointsPerRemainingStockCardOnWin;
 
   /// Number of streak points required to advance one multiplier step.
   ///
@@ -47,6 +51,7 @@ final class ScoreConfig {
       'pointsDrawFromStock': pointsDrawFromStock,
       'penaltyInvalidAction': penaltyInvalidAction,
       'pointsPeakCleared': pointsPeakCleared,
+      'pointsPerRemainingStockCardOnWin': pointsPerRemainingStockCardOnWin,
       'streakStepSize': streakStepSize,
       'multiplierStepIncrement': multiplierStepIncrement,
       'multiplierMax': multiplierMax,
@@ -75,6 +80,7 @@ final class ScoreConfig {
     final b = map['pointsDrawFromStock'];
     final c = map['penaltyInvalidAction'];
     final d = map['pointsPeakCleared'];
+    final remainingStockBonus = map['pointsPerRemainingStockCardOnWin'];
     final streakStepSize = map['streakStepSize'];
     final multiplierStepIncrement = map['multiplierStepIncrement'];
     final multiplierMax = map['multiplierMax'];
@@ -82,6 +88,7 @@ final class ScoreConfig {
         b is! int ||
         c is! int ||
         d is! int ||
+        (remainingStockBonus != null && remainingStockBonus is! int) ||
         (streakStepSize != null && streakStepSize is! int) ||
         (multiplierStepIncrement != null && multiplierStepIncrement is! int) ||
         (multiplierMax != null && multiplierMax is! int)) {
@@ -98,6 +105,7 @@ final class ScoreConfig {
         pointsDrawFromStock: b,
         penaltyInvalidAction: c,
         pointsPeakCleared: d,
+        pointsPerRemainingStockCardOnWin: remainingStockBonus as int? ?? 0,
         streakStepSize: streakStepSize as int? ?? 999999,
         multiplierStepIncrement: multiplierStepIncrement as int? ?? 0,
         multiplierMax: multiplierMax as int? ?? 1,
@@ -115,6 +123,7 @@ final class ScoreDeltaBreakdown {
     required this.peakBonusPoints,
     required this.drawPoints,
     required this.invalidPenaltyPoints,
+    required this.endRoundRemainingStockBonusPoints,
     required this.appliedMultiplier,
     required this.totalDelta,
   });
@@ -126,6 +135,7 @@ final class ScoreDeltaBreakdown {
     peakBonusPoints: 0,
     drawPoints: 0,
     invalidPenaltyPoints: 0,
+    endRoundRemainingStockBonusPoints: 0,
     appliedMultiplier: 1,
     totalDelta: 0,
   );
@@ -145,6 +155,9 @@ final class ScoreDeltaBreakdown {
   /// Penalty from invalid actions (0 or negative).
   final int invalidPenaltyPoints;
 
+  /// Bonus points from remaining stock when a round is won.
+  final int endRoundRemainingStockBonusPoints;
+
   /// Multiplier applied to the action's scoring computation.
   final int appliedMultiplier;
 
@@ -161,6 +174,7 @@ final class ScoreDeltaBreakdown {
       'peakBonusPoints': peakBonusPoints,
       'drawPoints': drawPoints,
       'invalidPenaltyPoints': invalidPenaltyPoints,
+      'endRoundRemainingStockBonusPoints': endRoundRemainingStockBonusPoints,
       'appliedMultiplier': appliedMultiplier,
       'totalDelta': totalDelta,
     };
@@ -191,6 +205,8 @@ final class ScoreDeltaBreakdown {
     final peakBonusPoints = map['peakBonusPoints'];
     final drawPoints = map['drawPoints'];
     final invalidPenaltyPoints = map['invalidPenaltyPoints'];
+    final endRoundRemainingStockBonusPoints =
+        map['endRoundRemainingStockBonusPoints'];
     final appliedMultiplier = map['appliedMultiplier'];
     final totalDelta = map['totalDelta'];
     if (tableauBasePoints is! int ||
@@ -198,6 +214,8 @@ final class ScoreDeltaBreakdown {
         peakBonusPoints is! int ||
         drawPoints is! int ||
         invalidPenaltyPoints is! int ||
+        (endRoundRemainingStockBonusPoints != null &&
+            endRoundRemainingStockBonusPoints is! int) ||
         appliedMultiplier is! int ||
         totalDelta is! int) {
       return const DecodeResult.failure(
@@ -214,6 +232,8 @@ final class ScoreDeltaBreakdown {
         peakBonusPoints: peakBonusPoints,
         drawPoints: drawPoints,
         invalidPenaltyPoints: invalidPenaltyPoints,
+        endRoundRemainingStockBonusPoints:
+            endRoundRemainingStockBonusPoints as int? ?? 0,
         appliedMultiplier: appliedMultiplier,
         totalDelta: totalDelta,
       ),
@@ -270,6 +290,7 @@ final class ScoreState {
           peakBonusPoints: 0,
           drawPoints: 0,
           invalidPenaltyPoints: delta < 0 ? delta : 0,
+          endRoundRemainingStockBonusPoints: 0,
           appliedMultiplier: normalizedMultiplier,
           totalDelta: delta,
         );
@@ -357,6 +378,7 @@ final class ScoreState {
         peakBonusPoints: 0,
         drawPoints: 0,
         invalidPenaltyPoints: lastDelta < 0 ? lastDelta : 0,
+        endRoundRemainingStockBonusPoints: 0,
         appliedMultiplier: currentMultiplier as int? ?? 1,
         totalDelta: lastDelta,
       );

@@ -273,7 +273,8 @@ void main() {
               breakdown.multiplierExtraPoints +
               breakdown.peakBonusPoints +
               breakdown.drawPoints +
-              breakdown.invalidPenaltyPoints,
+              breakdown.invalidPenaltyPoints +
+              breakdown.endRoundRemainingStockBonusPoints,
         );
         expect(result.scoreDelta, breakdown.totalDelta);
         expect(result.state.scoreState.lastDelta, breakdown.totalDelta);
@@ -312,6 +313,63 @@ void main() {
           undo.state.scoreState.lastBreakdown, restoredSnapshot.lastBreakdown);
       expect(undo.scoreBreakdown, equals(restoredSnapshot.lastBreakdown));
       expect(undo.appliedMultiplier, restoredSnapshot.currentMultiplier);
+    });
+
+    test('win awards remaining stock bonus exactly once', () {
+      final config = const ScoreConfig(pointsPerRemainingStockCardOnWin: 2);
+      final deck = _buildDeckWithBottomRow(
+        waste: const Card(Rank.six, Suit.spades),
+        bottomRow: <Card>[
+          const Card(Rank.five, Suit.clubs),
+          const Card(Rank.two, Suit.clubs),
+          const Card(Rank.three, Suit.clubs),
+          const Card(Rank.four, Suit.clubs),
+          const Card(Rank.five, Suit.hearts),
+          const Card(Rank.six, Suit.hearts),
+          const Card(Rank.seven, Suit.hearts),
+          const Card(Rank.eight, Suit.hearts),
+          const Card(Rank.nine, Suit.hearts),
+          const Card(Rank.ten, Suit.hearts),
+        ],
+      );
+      final base = TriPeaksState.newGame(deck: deck, scoreConfig: config);
+      final map = base.toMap();
+      map['removed'] = List<bool>.generate(
+        28,
+        (index) => index != 18,
+        growable: false,
+      );
+      final restored = TriPeaksState.tryFromMap(map);
+      expect(restored.isSuccess, isTrue);
+      final state = restored.value!;
+
+      final result = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(18),
+      );
+
+      expect(result.isSuccess, isTrue);
+      expect(result.state.isWon, isTrue);
+      final bonus =
+          result.state.stockCount * config.pointsPerRemainingStockCardOnWin;
+      expect(
+        result.scoreBreakdown.endRoundRemainingStockBonusPoints,
+        bonus,
+      );
+      expect(result.scoreBreakdown.totalDelta, result.scoreDelta);
+
+      final after = tryReduceTriPeaks(result.state, const UndoAction());
+      expect(after.isSuccess, isTrue);
+      expect(after.state.isWon, isFalse);
+      final reapply = tryReduceTriPeaks(
+        after.state,
+        const RemoveTableauCardAction(18),
+      );
+      expect(reapply.isSuccess, isTrue);
+      expect(
+        reapply.scoreBreakdown.endRoundRemainingStockBonusPoints,
+        bonus,
+      );
     });
 
     test('determinism: same seed + actions + config => same score', () {
@@ -2521,7 +2579,7 @@ void main() {
 
     test('fingerprint is stable for fixed canonical state', () {
       final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), '27be6eff');
+      expect(stateFingerprint(state), 'ce840073');
     });
   });
 

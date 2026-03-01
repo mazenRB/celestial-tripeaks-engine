@@ -59,6 +59,17 @@ final next = reduceTriPeaks(state, const DrawFromStockAction());
 
 Use `tryReduceTriPeaks` when you need typed error handling without throws.
 
+Score breakdown:
+
+- `tableauBasePoints`
+- `multiplierExtraPoints`
+- `peakBonusPoints`
+- `drawPoints`
+- `invalidPenaltyPoints`
+- `endRoundRemainingStockBonusPoints`
+- `appliedMultiplier`
+- `totalDelta`
+
 ### 2) Session Loop
 
 ```dart

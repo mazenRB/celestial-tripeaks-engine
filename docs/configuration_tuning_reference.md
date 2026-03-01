@@ -15,6 +15,7 @@ Defaults:
 - `pointsDrawFromStock = 0`
 - `penaltyInvalidAction = 0`
 - `pointsPeakCleared = 0`
+- `pointsPerRemainingStockCardOnWin = 0`
 - `streakStepSize = 999999`
 - `multiplierStepIncrement = 0`
 - `multiplierMax = 1`
@@ -42,12 +43,13 @@ Accepted actions expose score components through `ScoreDeltaBreakdown`:
 - `peakBonusPoints`
 - `drawPoints`
 - `invalidPenaltyPoints`
+- `endRoundRemainingStockBonusPoints`
 - `appliedMultiplier`
 - `totalDelta`
 
 Invariant:
 
-- `totalDelta == tableauBasePoints + multiplierExtraPoints + peakBonusPoints + drawPoints + invalidPenaltyPoints`
+- `totalDelta == tableauBasePoints + multiplierExtraPoints + peakBonusPoints + drawPoints + invalidPenaltyPoints + endRoundRemainingStockBonusPoints`
 
 Example:
 

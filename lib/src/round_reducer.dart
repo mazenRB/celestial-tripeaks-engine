@@ -96,11 +96,41 @@ TriPeaksReduceResult tryReduceTriPeaks(
     );
   }
 
+  final preWon = preprocessed.isWon;
   final applied = _applyAction(
     preprocessed,
     action,
     effectiveTick: effectiveTick,
   );
+  final postWon = applied.state.isWon;
+  if (!preWon && postWon) {
+    final bonus = applied.state.stock.length *
+        applied.state.scoreConfig.pointsPerRemainingStockCardOnWin;
+    if (bonus != 0) {
+      final breakdown = ScoreDeltaBreakdown(
+        tableauBasePoints: applied.scoreBreakdown.tableauBasePoints,
+        multiplierExtraPoints: applied.scoreBreakdown.multiplierExtraPoints,
+        peakBonusPoints: applied.scoreBreakdown.peakBonusPoints,
+        drawPoints: applied.scoreBreakdown.drawPoints,
+        invalidPenaltyPoints: applied.scoreBreakdown.invalidPenaltyPoints,
+        endRoundRemainingStockBonusPoints: bonus,
+        appliedMultiplier: applied.scoreBreakdown.appliedMultiplier,
+        totalDelta: applied.scoreBreakdown.totalDelta + bonus,
+      );
+      final nextScoreState = applied.state.scoreState.applyDelta(
+        bonus,
+        appliedMultiplier: applied.appliedMultiplier,
+        breakdown: breakdown,
+      );
+      final nextState = applied.state._copyWith(scoreState: nextScoreState);
+      return TriPeaksReduceResult(
+        state: nextState,
+        scoreDelta: applied.scoreDelta + bonus,
+        scoreBreakdown: breakdown,
+        appliedMultiplier: applied.appliedMultiplier,
+      );
+    }
+  }
   return TriPeaksReduceResult(
     state: applied.state,
     scoreDelta: applied.scoreDelta,
@@ -189,6 +219,7 @@ TriPeaksReduceResult tryReduceTriPeaks(
         peakBonusPoints: peakBonusPoints,
         drawPoints: 0,
         invalidPenaltyPoints: 0,
+        endRoundRemainingStockBonusPoints: 0,
         appliedMultiplier: appliedMultiplier,
         totalDelta: delta,
       );
@@ -317,6 +348,7 @@ ScoreDeltaBreakdown _buildDrawBreakdown(int drawPoints) {
     peakBonusPoints: 0,
     drawPoints: drawPoints,
     invalidPenaltyPoints: 0,
+    endRoundRemainingStockBonusPoints: 0,
     appliedMultiplier: 1,
     totalDelta: drawPoints,
   );
@@ -329,6 +361,7 @@ ScoreDeltaBreakdown _buildInvalidPenaltyBreakdown(int penalty) {
     peakBonusPoints: 0,
     drawPoints: 0,
     invalidPenaltyPoints: penalty,
+    endRoundRemainingStockBonusPoints: 0,
     appliedMultiplier: 1,
     totalDelta: penalty,
   );
