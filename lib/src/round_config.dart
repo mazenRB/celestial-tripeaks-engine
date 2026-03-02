@@ -10,6 +10,7 @@ final class ScoreConfig {
     this.pointsPeakCleared = 0,
     this.pointsPerRemainingStockCardOnWin = 0,
     this.multiplierMode = ScoreMultiplierMode.streak,
+    this.roundBasePointsGrowthBps = 0,
     this.streakStepSize = 999999,
     this.multiplierStepIncrement = 0,
     this.multiplierMax = 1,
@@ -36,6 +37,9 @@ final class ScoreConfig {
 
   /// Selects which multiplier system is active for scoring.
   final ScoreMultiplierMode multiplierMode;
+
+  /// Compounding growth applied to tableau base points per round (bps).
+  final int roundBasePointsGrowthBps;
 
   /// Number of streak points required to advance one multiplier step.
   ///
@@ -65,6 +69,7 @@ final class ScoreConfig {
       'pointsPeakCleared': pointsPeakCleared,
       'pointsPerRemainingStockCardOnWin': pointsPerRemainingStockCardOnWin,
       'multiplierMode': multiplierMode.name,
+      'roundBasePointsGrowthBps': roundBasePointsGrowthBps,
       'streakStepSize': streakStepSize,
       'multiplierStepIncrement': multiplierStepIncrement,
       'multiplierMax': multiplierMax,
@@ -97,6 +102,7 @@ final class ScoreConfig {
     final d = map['pointsPeakCleared'];
     final remainingStockBonus = map['pointsPerRemainingStockCardOnWin'];
     final multiplierMode = map['multiplierMode'];
+    final roundBasePointsGrowthBps = map['roundBasePointsGrowthBps'];
     final streakStepSize = map['streakStepSize'];
     final multiplierStepIncrement = map['multiplierStepIncrement'];
     final multiplierMax = map['multiplierMax'];
@@ -108,6 +114,8 @@ final class ScoreConfig {
         d is! int ||
         (remainingStockBonus != null && remainingStockBonus is! int) ||
         (multiplierMode != null && multiplierMode is! String) ||
+        (roundBasePointsGrowthBps != null &&
+            roundBasePointsGrowthBps is! int) ||
         (streakStepSize != null && streakStepSize is! int) ||
         (multiplierStepIncrement != null && multiplierStepIncrement is! int) ||
         (multiplierMax != null && multiplierMax is! int) ||
@@ -141,6 +149,7 @@ final class ScoreConfig {
         pointsPeakCleared: d,
         pointsPerRemainingStockCardOnWin: remainingStockBonus as int? ?? 0,
         multiplierMode: resolvedMode,
+        roundBasePointsGrowthBps: roundBasePointsGrowthBps as int? ?? 0,
         streakStepSize: streakStepSize as int? ?? 999999,
         multiplierStepIncrement: multiplierStepIncrement as int? ?? 0,
         multiplierMax: multiplierMax as int? ?? 1,

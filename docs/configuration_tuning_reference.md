@@ -17,6 +17,7 @@ Defaults:
 - `pointsPeakCleared = 0`
 - `pointsPerRemainingStockCardOnWin = 0`
 - `multiplierMode = streak`
+- `roundBasePointsGrowthBps = 0`
 - `streakStepSize = 999999`
 - `multiplierStepIncrement = 0`
 - `multiplierMax = 1`
@@ -31,6 +32,13 @@ Multiplier formula for successful tableau removals:
 
 In PR1, multiplier applies only to tableau base points. Draw points and peak
 bonus points are not multiplied.
+
+Round-based base points progression:
+
+- `roundBasePointsGrowthBps` compounds base tableau points by round.
+- Growth factor per round: `growthFactorBps = 10000 + roundBasePointsGrowthBps`.
+- Effective base uses per-round floor:  
+  `effective = pointsTableauToWaste; for i in 2..roundNumber: effective = (effective * growthFactorBps) ~/ 10000`.
 
 Time bonus multiplier mode:
 

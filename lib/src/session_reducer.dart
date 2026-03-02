@@ -327,6 +327,7 @@ final class _TriPeaksSnapshot {
     required this.removed,
     required this.waste,
     required this.stock,
+    required this.roundNumber,
     required this.scoreState,
     required this.streakState,
     required this.strikeTimerState,
@@ -341,6 +342,7 @@ final class _TriPeaksSnapshot {
   final List<bool> removed;
   final List<Card> waste;
   final List<Card> stock;
+  final int roundNumber;
   final ScoreState scoreState;
   final StreakState streakState;
   final StrikeTimerState strikeTimerState;
@@ -358,6 +360,7 @@ final class _TriPeaksSnapshot {
       'removed': removed,
       'waste': waste.map((card) => card.toMap()).toList(growable: false),
       'stock': stock.map((card) => card.toMap()).toList(growable: false),
+      'roundNumber': roundNumber,
       'scoreState': scoreState.toMap(),
       'streakState': streakState.toMap(),
       'strikeTimerState': strikeTimerState.toMap(),
@@ -399,6 +402,15 @@ final class _TriPeaksSnapshot {
     final stockResult = TriPeaksState._decodeCardList(map['stock'], 'stock');
     if (!stockResult.isSuccess) {
       return DecodeResult.failure(stockResult.error!);
+    }
+    final roundNumber = map['roundNumber'];
+    if (roundNumber is! int) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'roundNumber must be int.',
+        ),
+      );
     }
     final removed = map['removed'];
     if (removed is! List<dynamic> || removed.any((value) => value is! bool)) {
@@ -506,6 +518,7 @@ final class _TriPeaksSnapshot {
         removed: removed.cast<bool>(),
         waste: wasteResult.value!,
         stock: stockResult.value!,
+        roundNumber: roundNumber,
         scoreState: scoreResult.value!,
         streakState: streakResult.value!,
         strikeTimerState: strikeTimerResult.value!,

@@ -15,6 +15,7 @@ final class TriPeaksState {
   factory TriPeaksState.newGame({
     int? seed,
     List<Card>? deck,
+    int roundNumber = 1,
     ScoreConfig scoreConfig = const ScoreConfig(),
     RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
     UndoConfig undoConfig = const UndoConfig(),
@@ -41,6 +42,7 @@ final class TriPeaksState {
       removed: List<bool>.filled(_tableauSize, false, growable: false),
       waste: <Card>[initialWaste],
       stock: workingDeck.skip(_tableauSize + 1).toList(growable: false),
+      roundNumber: roundNumber,
       roundSeed: effectiveSeed,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
@@ -65,6 +67,7 @@ final class TriPeaksState {
     required List<bool> removed,
     required List<Card> waste,
     required List<Card> stock,
+    required this.roundNumber,
     required this.roundSeed,
     required this.scoreConfig,
     required this.roundRulesConfig,
@@ -132,6 +135,9 @@ final class TriPeaksState {
 
   /// Stock pile from next-to-draw at index `0`.
   final List<Card> stock;
+
+  /// 1-based round number for scoring progression.
+  final int roundNumber;
 
   /// Deterministic round seed used for policy-level pseudo-random choices.
   final int roundSeed;
@@ -350,6 +356,7 @@ final class TriPeaksState {
     List<bool>? removed,
     List<Card>? waste,
     List<Card>? stock,
+    int? roundNumber,
     int? roundSeed,
     ScoreState? scoreState,
     StreakState? streakState,
@@ -370,6 +377,7 @@ final class TriPeaksState {
       removed: removed ?? this.removed,
       waste: syncedWaste,
       stock: stock ?? this.stock,
+      roundNumber: roundNumber ?? this.roundNumber,
       roundSeed: roundSeed ?? this.roundSeed,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
@@ -399,6 +407,7 @@ final class TriPeaksState {
       removed: removed,
       waste: waste,
       stock: stock,
+      roundNumber: roundNumber,
       scoreState: scoreState,
       streakState: streakState,
       strikeTimerState: strikeTimerState,
@@ -416,6 +425,7 @@ final class TriPeaksState {
       removed: snapshot.removed,
       waste: snapshot.waste,
       stock: snapshot.stock,
+      roundNumber: snapshot.roundNumber,
       scoreState: snapshot.scoreState,
       streakState: snapshot.streakState,
       strikeTimerState: snapshot.strikeTimerState,
@@ -471,6 +481,7 @@ final class TriPeaksState {
       'removed': removed,
       'waste': waste.map((card) => card.toMap()).toList(growable: false),
       'stock': stock.map((card) => card.toMap()).toList(growable: false),
+      'roundNumber': roundNumber,
       'roundSeed': roundSeed,
       'scoreConfig': scoreConfig.toMap(),
       'roundRulesConfig': roundRulesConfig.toMap(),
@@ -523,6 +534,15 @@ final class TriPeaksState {
     final stockResult = _decodeCardList(map['stock'], 'stock');
     if (!stockResult.isSuccess) {
       return DecodeResult.failure(stockResult.error!);
+    }
+    final roundNumber = map['roundNumber'];
+    if (roundNumber != null && roundNumber is! int) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'roundNumber must be int when present.',
+        ),
+      );
     }
 
     final removed = map['removed'];
@@ -792,6 +812,7 @@ final class TriPeaksState {
         removed: removed.cast<bool>(),
         waste: normalizedWaste,
         stock: stockResult.value!,
+        roundNumber: roundNumber as int? ?? 1,
         roundSeed: roundSeed as int? ?? defaultSeed,
         scoreConfig: scoreConfigResult.value!,
         roundRulesConfig: roundRulesResult.value!,

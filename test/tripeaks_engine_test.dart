@@ -162,6 +162,100 @@ void main() {
       expect(first.scoreDelta, 5);
     });
 
+    test('round base points progression compounds per round', () {
+      final config = const ScoreConfig(
+        pointsTableauToWaste: 10,
+        roundBasePointsGrowthBps: 2000,
+      );
+      final r1 = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: config,
+        roundNumber: 1,
+      );
+      final r2 = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: config,
+        roundNumber: 2,
+      );
+      final r3 = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: config,
+        roundNumber: 3,
+      );
+
+      expect(
+        tryReduceTriPeaks(r1, const RemoveTableauCardAction(18)).scoreDelta,
+        10,
+      );
+      expect(
+        tryReduceTriPeaks(r2, const RemoveTableauCardAction(18)).scoreDelta,
+        12,
+      );
+      expect(
+        tryReduceTriPeaks(r3, const RemoveTableauCardAction(18)).scoreDelta,
+        14,
+      );
+    });
+
+    test('round base points progression floors each step', () {
+      final config = const ScoreConfig(
+        pointsTableauToWaste: 7,
+        roundBasePointsGrowthBps: 1500,
+      );
+      final r2 = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: config,
+        roundNumber: 2,
+      );
+      final r3 = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: config,
+        roundNumber: 3,
+      );
+
+      expect(
+        tryReduceTriPeaks(r2, const RemoveTableauCardAction(18)).scoreDelta,
+        8,
+      );
+      expect(
+        tryReduceTriPeaks(r3, const RemoveTableauCardAction(18)).scoreDelta,
+        9,
+      );
+    });
+
+    test('session rounds apply compounding base points', () {
+      final config = const ScoreConfig(
+        pointsTableauToWaste: 10,
+        roundBasePointsGrowthBps: 2000,
+      );
+      final decks = <List<Card>>[
+        _buildStreakUnlockDeck(),
+        _buildStreakUnlockDeck(),
+        _buildStreakUnlockDeck(),
+      ];
+      var session = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        roundDecks: decks,
+        scoreConfig: config,
+      );
+
+      final r1 = tryReduceTriPeaks(
+        session.currentRound,
+        const RemoveTableauCardAction(18),
+      );
+      expect(r1.scoreDelta, 10);
+
+      session = reduceTriPeaksSession(
+        session,
+        const AbortRoundAction(),
+      );
+      final r2 = tryReduceTriPeaks(
+        session.currentRound,
+        const RemoveTableauCardAction(18),
+      );
+      expect(r2.scoreDelta, 12);
+    });
+
     test('time bonus mode does not stack with streak multiplier', () {
       final config = const ScoreConfig(
         multiplierMode: ScoreMultiplierMode.timeBonus,
@@ -2795,7 +2889,7 @@ void main() {
 
     test('fingerprint is stable for fixed canonical state', () {
       final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), '16923606');
+      expect(stateFingerprint(state), '0a076ab6');
     });
   });
 

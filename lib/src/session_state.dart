@@ -224,6 +224,7 @@ final class TriPeaksSessionState {
     if (roundDecks case final decks?) {
       return TriPeaksState.newGame(
         deck: decks[roundNumber - 1],
+        roundNumber: roundNumber,
         scoreConfig: scoreConfig,
         roundRulesConfig: roundRulesConfig,
         undoConfig: undoConfig,
@@ -236,6 +237,7 @@ final class TriPeaksSessionState {
     final roundSeed = seed == null ? null : seed + roundNumber - 1;
     return TriPeaksState.newGame(
       seed: roundSeed,
+      roundNumber: roundNumber,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
       undoConfig: undoConfig,

@@ -222,7 +222,10 @@ TriPeaksReduceResult tryReduceTriPeaks(
         preTimeStepCount,
         state.streakState.currentStreak,
       );
-      final tableauBasePoints = state.scoreConfig.pointsTableauToWaste;
+      final tableauBasePoints = _computeEffectiveTableauBasePoints(
+        state.scoreConfig,
+        state.roundNumber,
+      );
       final multiplierExtraPoints = tableauBasePoints * (appliedMultiplier - 1);
       final peakBonusPoints =
           state.scoreConfig.pointsPeakCleared * peakBonus.newlyClearedCount;
@@ -406,6 +409,20 @@ int _computeActiveMultiplier(
     return raw < 1 ? 1 : raw;
   }
   return _computeAppliedMultiplier(preStreak, config);
+}
+
+int _computeEffectiveTableauBasePoints(ScoreConfig config, int roundNumber) {
+  var effective = config.pointsTableauToWaste;
+  final growthBps = config.roundBasePointsGrowthBps;
+  if (growthBps == 0 || roundNumber <= 1) {
+    return effective;
+  }
+  final factor = 10000 + growthBps;
+  final targetRound = roundNumber < 1 ? 1 : roundNumber;
+  for (var i = 2; i <= targetRound; i++) {
+    effective = (effective * factor) ~/ 10000;
+  }
+  return effective;
 }
 
 TimeBonusTimerState _onTimeBonusAdvanced(
