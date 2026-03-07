@@ -88,6 +88,99 @@ void main() {
       expect(state.stockCount, greaterThan(next.stockCount));
     });
 
+    test('stock size progression uses defaults at round 1', () {
+      final state = TriPeaksState.newGame(seed: 7);
+
+      expect(state.stockCount, 21);
+    });
+
+    test('stock size progression decreases every N rounds', () {
+      final rules = const RoundRulesConfig(
+        startStockSize: 21,
+        stockDecreaseEveryRounds: 2,
+        minStockSize: 12,
+      );
+      final r1 = TriPeaksState.newGame(
+        seed: 1,
+        roundNumber: 1,
+        roundRulesConfig: rules,
+      );
+      final r2 = TriPeaksState.newGame(
+        seed: 1,
+        roundNumber: 2,
+        roundRulesConfig: rules,
+      );
+      final r3 = TriPeaksState.newGame(
+        seed: 1,
+        roundNumber: 3,
+        roundRulesConfig: rules,
+      );
+      final r4 = TriPeaksState.newGame(
+        seed: 1,
+        roundNumber: 4,
+        roundRulesConfig: rules,
+      );
+
+      expect(r1.stockCount, 21);
+      expect(r2.stockCount, 20);
+      expect(r3.stockCount, 20);
+      expect(r4.stockCount, 19);
+    });
+
+    test('stock size progression respects minimum cap', () {
+      final rules = const RoundRulesConfig(
+        startStockSize: 14,
+        stockDecreaseEveryRounds: 1,
+        minStockSize: 12,
+      );
+      final r5 = TriPeaksState.newGame(
+        seed: 1,
+        roundNumber: 5,
+        roundRulesConfig: rules,
+      );
+
+      expect(r5.stockCount, 12);
+    });
+
+    test('stock size validation uses layout-derived availability', () {
+      final base = TriPeaksState.newGame(seed: 2);
+      final available = 52 - base.tableau.length - 1;
+      final rules = RoundRulesConfig(
+        startStockSize: available + 1,
+        stockDecreaseEveryRounds: 2,
+        minStockSize: 0,
+      );
+
+      expect(
+        () => TriPeaksState.newGame(seed: 2, roundRulesConfig: rules),
+        throwsArgumentError,
+      );
+    });
+
+    test('session rounds apply stock size progression', () {
+      final rules = const RoundRulesConfig(
+        startStockSize: 21,
+        stockDecreaseEveryRounds: 2,
+        minStockSize: 12,
+      );
+      final decks = <List<Card>>[
+        _buildStreakUnlockDeck(),
+        _buildStreakUnlockDeck(),
+        _buildStreakUnlockDeck(),
+      ];
+      var session = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        roundDecks: decks,
+        roundRulesConfig: rules,
+      );
+
+      expect(session.currentRound.stockCount, 21);
+      session = reduceTriPeaksSession(session, const AbortRoundAction());
+      expect(session.currentRound.stockCount, 20);
+      session = reduceTriPeaksSession(session, const AbortRoundAction());
+      expect(session.currentRound.stockCount, 20);
+    });
+
     test('default scoring: tableau +5, draw +0, invalid +0', () {
       final deck = _buildDeck(
         tableauOverrides: <int, Card>{
@@ -717,24 +810,24 @@ void main() {
       state = reduceTriPeaks(state, const DrawFromStockAction());
 
       expect(state.undoStepsAvailable, 3);
-      expect(state.stockCount, 19);
+      expect(state.stockCount, 17);
 
       state = reduceTriPeaks(state, const UndoAction());
-      expect(state.stockCount, 20);
+      expect(state.stockCount, 18);
       expect(state.undoStepsAvailable, 2);
 
       state = reduceTriPeaks(state, const UndoAction());
-      expect(state.stockCount, 21);
+      expect(state.stockCount, 19);
       expect(state.undoStepsAvailable, 1);
 
       state = reduceTriPeaks(state, const UndoAction());
-      expect(state.stockCount, 22);
+      expect(state.stockCount, 20);
       expect(state.undoStepsAvailable, 0);
 
       final noUndo = tryReduceTriPeaks(state, const UndoAction());
       expect(noUndo.isSuccess, isFalse);
       expect(noUndo.error?.code, TriPeaksErrorCode.nothingToUndo);
-      expect(noUndo.state.stockCount, 22);
+      expect(noUndo.state.stockCount, 20);
       expect(noUndo.state.undoStepsAvailable, 0);
     });
 
@@ -1661,6 +1754,12 @@ void main() {
     });
 
     test('can advance to next round after finishing current round', () {
+      final fullStockSize = _layoutStockCapacity();
+      final roundRules = RoundRulesConfig(
+        startStockSize: fullStockSize,
+        stockDecreaseEveryRounds: 100,
+        minStockSize: fullStockSize,
+      );
       final round1Deck = _buildAlwaysLostDeck(
         waste: const Card(Rank.ace, Suit.clubs),
       );
@@ -1673,6 +1772,7 @@ void main() {
 
       var session = TriPeaksSessionState.newSession(
         ruleset: TriPeaksRuleset.threeRounds,
+        roundRulesConfig: roundRules,
         roundDecks: <List<Card>>[
           round1Deck,
           round2Deck,
@@ -1753,6 +1853,12 @@ void main() {
     });
 
     test('session status helper transitions deterministically', () {
+      final fullStockSize = _layoutStockCapacity();
+      final roundRules = RoundRulesConfig(
+        startStockSize: fullStockSize,
+        stockDecreaseEveryRounds: 100,
+        minStockSize: fullStockSize,
+      );
       var session = TriPeaksSessionState.newSession(
         ruleset: TriPeaksRuleset.threeRounds,
         roundDecks: <List<Card>>[
@@ -1766,6 +1872,7 @@ void main() {
             waste: const Card(Rank.queen, Suit.clubs),
           ),
         ],
+        roundRulesConfig: roundRules,
       );
       expect(session.status, TriPeaksSessionStatus.inProgress);
 
@@ -1824,7 +1931,11 @@ void main() {
         ruleset: TriPeaksRuleset.threeRounds,
         seed: 17,
       );
-      final expectedRoundTwo = TriPeaksState.newGame(seed: 18);
+      final expectedRoundTwo = TriPeaksState.newGame(
+        seed: 18,
+        roundNumber: 2,
+        roundRulesConfig: session.roundRulesConfig,
+      );
 
       final next = reduceTriPeaksSession(
         session,
@@ -1846,6 +1957,12 @@ void main() {
     });
 
     test('cumulative totals are deterministic and avoid double counting', () {
+      final fullStockSize = _layoutStockCapacity();
+      final roundRules = RoundRulesConfig(
+        startStockSize: fullStockSize,
+        stockDecreaseEveryRounds: 100,
+        minStockSize: fullStockSize,
+      );
       var session = TriPeaksSessionState.newSession(
         ruleset: TriPeaksRuleset.threeRounds,
         roundDecks: <List<Card>>[
@@ -1860,6 +1977,7 @@ void main() {
           ),
         ],
         scoreConfig: const ScoreConfig(pointsDrawFromStock: 1),
+        roundRulesConfig: roundRules,
       );
 
       session = reduceTriPeaksSession(
@@ -2889,7 +3007,7 @@ void main() {
 
     test('fingerprint is stable for fixed canonical state', () {
       final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), '0a076ab6');
+      expect(stateFingerprint(state), '54f511b5');
     });
   });
 
@@ -4228,6 +4346,11 @@ List<Card> _buildDeckWithBottomRow({
     _placeCard(deck, 18 + i, bottomRow[i]);
   }
   return deck;
+}
+
+int _layoutStockCapacity() {
+  final state = TriPeaksState.newGame(seed: 0);
+  return 52 - state.tableau.length - 1;
 }
 
 TriPeaksState _applyTryActions(

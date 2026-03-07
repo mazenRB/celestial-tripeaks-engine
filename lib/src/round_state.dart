@@ -28,7 +28,22 @@ final class TriPeaksState {
         ? (Card.standardDeck()..shuffle(Random(effectiveSeed)))
         : List<Card>.from(deck);
     _validateDeck(workingDeck);
-    final initialWaste = workingDeck[_tableauSize];
+    final tableauCardsNeeded = _tableauSize;
+    const wasteCardsNeeded = 1;
+    final stockSize = _computeStockSize(
+      roundNumber,
+      roundRulesConfig,
+    );
+    final available =
+        workingDeck.length - tableauCardsNeeded - wasteCardsNeeded;
+    if (stockSize > available) {
+      throw ArgumentError.value(
+        stockSize,
+        'stockSize',
+        'Stock size exceeds available cards ($available).',
+      );
+    }
+    final initialWaste = workingDeck[tableauCardsNeeded];
     final initialBonusSlots = BonusSlotsState.initial.copyWith(
       slots: <List<Card>>[
         <Card>[initialWaste],
@@ -38,10 +53,13 @@ final class TriPeaksState {
     );
 
     return TriPeaksState._(
-      tableau: workingDeck.take(_tableauSize).toList(growable: false),
-      removed: List<bool>.filled(_tableauSize, false, growable: false),
+      tableau: workingDeck.take(tableauCardsNeeded).toList(growable: false),
+      removed: List<bool>.filled(tableauCardsNeeded, false, growable: false),
       waste: <Card>[initialWaste],
-      stock: workingDeck.skip(_tableauSize + 1).toList(growable: false),
+      stock: workingDeck
+          .skip(tableauCardsNeeded + wasteCardsNeeded)
+          .take(stockSize)
+          .toList(growable: false),
       roundNumber: roundNumber,
       roundSeed: effectiveSeed,
       scoreConfig: scoreConfig,
@@ -90,8 +108,6 @@ final class TriPeaksState {
         stock = List<Card>.unmodifiable(stock),
         _undoHistory = List<_TriPeaksSnapshot>.unmodifiable(undoHistory);
 
-  static const int _tableauSize = 28;
-
   // For each tableau index, these indices must be removed before it is exposed.
   static const List<List<int>> _blockingIndices = <List<int>>[
     <int>[3, 4],
@@ -123,6 +139,8 @@ final class TriPeaksState {
     <int>[],
     <int>[],
   ];
+
+  static final int _tableauSize = _blockingIndices.length;
 
   /// Tableau cards in fixed index order.
   final List<Card> tableau;
@@ -455,6 +473,12 @@ final class TriPeaksState {
     <int>[1, 5, 6, 12, 13, 14, 21, 22, 23, 24],
     <int>[2, 7, 8, 15, 16, 17, 24, 25, 26, 27],
   ];
+
+  static int _computeStockSize(int roundNumber, RoundRulesConfig rules) {
+    final decrease = roundNumber ~/ rules.stockDecreaseEveryRounds;
+    final size = rules.startStockSize - decrease;
+    return size < rules.minStockSize ? rules.minStockSize : size;
+  }
 
   static void _validateDeck(List<Card> deck) {
     if (deck.length != 52) {

@@ -92,10 +92,17 @@ print('multiplier=${state.scoreState.currentMultiplier}');
 Default:
 
 - `aceKingWrapAround = true`
+- `startStockSize = 21`
+- `stockDecreaseEveryRounds = 2`
+- `minStockSize = 12`
 
 Risk notes:
 
 - Disabling wrap-around reduces available removals and increases fail states.
+- Stock size progression uses the layout's tableau slot count and one waste
+  card when validating availability.
+- Stock size is computed per round:
+  `max(minStockSize, startStockSize - (roundNumber ~/ stockDecreaseEveryRounds))`
 
 ### `UndoConfig`
 

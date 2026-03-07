@@ -553,12 +553,35 @@ final class StreakState {
 /// Configurable round mechanics rules.
 final class RoundRulesConfig {
   /// Creates a round rules config.
-  const RoundRulesConfig({this.aceKingWrapAround = true});
+  const RoundRulesConfig({
+    this.aceKingWrapAround = true,
+    this.startStockSize = 21,
+    this.stockDecreaseEveryRounds = 2,
+    this.minStockSize = 12,
+  })  : assert(startStockSize >= 0, 'startStockSize must be >= 0.'),
+        assert(
+          stockDecreaseEveryRounds >= 1,
+          'stockDecreaseEveryRounds must be >= 1.',
+        ),
+        assert(minStockSize >= 0, 'minStockSize must be >= 0.'),
+        assert(
+          startStockSize >= minStockSize,
+          'startStockSize must be >= minStockSize.',
+        );
 
   /// Whether ace and king are treated as adjacent.
   ///
   /// Set this to `true` for easy/wrap modes.
   final bool aceKingWrapAround;
+
+  /// Initial stock size before round-based decreases.
+  final int startStockSize;
+
+  /// Number of rounds between each stock size decrease.
+  final int stockDecreaseEveryRounds;
+
+  /// Minimum stock size after all decreases.
+  final int minStockSize;
 
   /// Serializes config to JSON-friendly map.
   Map<String, dynamic> toMap() {
@@ -566,6 +589,9 @@ final class RoundRulesConfig {
       'schemaVersion': _serializationSchemaV1,
       'type': 'round_rules_config',
       'aceKingWrapAround': aceKingWrapAround,
+      'startStockSize': startStockSize,
+      'stockDecreaseEveryRounds': stockDecreaseEveryRounds,
+      'minStockSize': minStockSize,
     };
   }
 
@@ -596,7 +622,31 @@ final class RoundRulesConfig {
         ),
       );
     }
-    return DecodeResult.success(RoundRulesConfig(aceKingWrapAround: wrap));
+    final startStockSize = map['startStockSize'] ?? 21;
+    final stockDecreaseEveryRounds = map['stockDecreaseEveryRounds'] ?? 2;
+    final minStockSize = map['minStockSize'] ?? 12;
+    if (startStockSize is! int ||
+        stockDecreaseEveryRounds is! int ||
+        minStockSize is! int ||
+        startStockSize < 0 ||
+        stockDecreaseEveryRounds < 1 ||
+        minStockSize < 0 ||
+        startStockSize < minStockSize) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'Invalid RoundRulesConfig payload.',
+        ),
+      );
+    }
+    return DecodeResult.success(
+      RoundRulesConfig(
+        aceKingWrapAround: wrap,
+        startStockSize: startStockSize,
+        stockDecreaseEveryRounds: stockDecreaseEveryRounds,
+        minStockSize: minStockSize,
+      ),
+    );
   }
 }
 
