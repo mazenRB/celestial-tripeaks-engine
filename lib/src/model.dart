@@ -357,6 +357,21 @@ final class DailyChallengeConfig {
     this.roundCount,
   });
 
+  /// Creates a daily config from a canonical engine-owned preset.
+  factory DailyChallengeConfig.forPreset({
+    required String namespaceId,
+    required TriPeaksModePreset preset,
+    int schemaVersion = 1,
+    int? roundCount,
+  }) {
+    return DailyChallengeConfig(
+      namespaceId: namespaceId,
+      modeId: preset.modeId,
+      schemaVersion: schemaVersion,
+      roundCount: roundCount,
+    );
+  }
+
   /// Namespace to avoid collisions between app variants/environments.
   final String namespaceId;
 

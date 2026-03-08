@@ -11,6 +11,7 @@ part 'src/model.dart';
 part 'src/round_config.dart';
 part 'src/match_scoring_types.dart';
 part 'src/engine_types.dart';
+part 'src/mode_bundle.dart';
 part 'src/serialization.dart';
 part 'src/round_state.dart';
 part 'src/session_state.dart';

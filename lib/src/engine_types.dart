@@ -328,6 +328,27 @@ final class TriPeaksRuleset {
   }
 }
 
+/// Stable engine-owned gameplay preset identifiers.
+enum TriPeaksModePreset {
+  classic('classic'),
+  celestial('celestial');
+
+  const TriPeaksModePreset(this.modeId);
+
+  /// Stable serialized id for this preset.
+  final String modeId;
+
+  /// Parses a preset id without throwing.
+  static TriPeaksModePreset? tryParseModeId(String value) {
+    for (final preset in values) {
+      if (preset.modeId == value) {
+        return preset;
+      }
+    }
+    return null;
+  }
+}
+
 /// Base type for all TriPeaks actions.
 sealed class TriPeaksAction {
   const TriPeaksAction();

@@ -2306,7 +2306,122 @@ void main() {
     });
   });
 
+  group('Mode presets', () {
+    test('preset ids are stable and parse deterministically', () {
+      expect(TriPeaksModePreset.classic.modeId, 'classic');
+      expect(TriPeaksModePreset.celestial.modeId, 'celestial');
+      expect(
+        TriPeaksModePreset.tryParseModeId('classic'),
+        TriPeaksModePreset.classic,
+      );
+      expect(
+        TriPeaksModePreset.tryParseModeId('celestial'),
+        TriPeaksModePreset.celestial,
+      );
+      expect(TriPeaksModePreset.tryParseModeId('unknown'), isNull);
+    });
+
+    test('classic bundle matches current defaults', () {
+      const bundle = TriPeaksModeBundle.classic;
+
+      expect(bundle.preset, TriPeaksModePreset.classic);
+      expect(bundle.ruleset, TriPeaksRuleset.threeRounds);
+      expect(bundle.scoreConfig.toMap(), const ScoreConfig().toMap());
+      expect(
+        bundle.roundRulesConfig.toMap(),
+        const RoundRulesConfig().toMap(),
+      );
+      expect(bundle.undoConfig.toMap(), const UndoConfig().toMap());
+      expect(bundle.streakConfig.toMap(), const StreakConfig().toMap());
+      expect(
+        bundle.strikeTimerConfig.toMap(),
+        const StrikeTimerConfig().toMap(),
+      );
+      expect(
+        bundle.bonusSlotsConfig.toMap(),
+        const BonusSlotsConfig().toMap(),
+      );
+    });
+
+    test('celestial bundle is fully populated and distinct', () {
+      final bundle = TriPeaksModeBundle.forPreset(
+        TriPeaksModePreset.celestial,
+      );
+
+      expect(bundle.preset, TriPeaksModePreset.celestial);
+      expect(bundle.ruleset, TriPeaksRuleset.tenRounds);
+      expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.timeBonus);
+      expect(bundle.roundRulesConfig.minStockSize, 16);
+      expect(bundle.undoConfig.enabled, isFalse);
+      expect(bundle.strikeTimerConfig.enabled, isFalse);
+      expect(bundle.bonusSlotsConfig.spawnOnOpenSlot2AtStreak, 3);
+      expect(bundle.bonusSlotsConfig.spawnOnOpenSlot3AtStreak, 8);
+      expect(bundle, isNot(TriPeaksModeBundle.classic));
+    });
+
+    test('bundle fields can be reused across session replay and match setup',
+        () {
+      final bundle = TriPeaksModeBundle.forPreset(
+        TriPeaksModePreset.celestial,
+      );
+      final session = TriPeaksSessionState.newSession(
+        ruleset: bundle.ruleset,
+        seed: 42,
+        scoreConfig: bundle.scoreConfig,
+        roundRulesConfig: bundle.roundRulesConfig,
+        undoConfig: bundle.undoConfig,
+        streakConfig: bundle.streakConfig,
+        strikeTimerConfig: bundle.strikeTimerConfig,
+        bonusSlotsConfig: bundle.bonusSlotsConfig,
+      );
+      final replay = TriPeaksReplay.newSession(
+        seed: 42,
+        ruleset: bundle.ruleset,
+        scoreConfig: bundle.scoreConfig,
+        roundRulesConfig: bundle.roundRulesConfig,
+        undoConfig: bundle.undoConfig,
+        streakConfig: bundle.streakConfig,
+        strikeTimerConfig: bundle.strikeTimerConfig,
+        bonusSlotsConfig: bundle.bonusSlotsConfig,
+      );
+      final match = MatchConfig(
+        matchMode: MatchMode.realtime,
+        matchId: 'mode-test',
+        matchSeed: 42,
+        maxPlayers: 2,
+        ruleset: bundle.ruleset,
+        scoreConfig: bundle.scoreConfig,
+        roundRulesConfig: bundle.roundRulesConfig,
+        undoConfig: bundle.undoConfig,
+        streakConfig: bundle.streakConfig,
+        strikeTimerConfig: bundle.strikeTimerConfig,
+        bonusSlotsConfig: bundle.bonusSlotsConfig,
+      );
+
+      expect(session.ruleset, bundle.ruleset);
+      expect(session.scoreConfig.toMap(), bundle.scoreConfig.toMap());
+      expect(replay.ruleset, bundle.ruleset);
+      expect(replay.scoreConfig.toMap(), bundle.scoreConfig.toMap());
+      expect(match.ruleset, bundle.ruleset);
+      expect(match.scoreConfig.toMap(), bundle.scoreConfig.toMap());
+    });
+  });
+
   group('Daily challenge', () {
+    test('preset-backed daily config uses canonical mode ids', () {
+      final classic = DailyChallengeConfig.forPreset(
+        namespaceId: 'prod',
+        preset: TriPeaksModePreset.classic,
+      );
+      final celestial = DailyChallengeConfig.forPreset(
+        namespaceId: 'prod',
+        preset: TriPeaksModePreset.celestial,
+      );
+
+      expect(classic.modeId, 'classic');
+      expect(celestial.modeId, 'celestial');
+    });
+
     test('same date + same config gives same seed and same initial deal', () {
       const config = DailyChallengeConfig(
         namespaceId: 'prod',
@@ -2379,6 +2494,46 @@ void main() {
       final explicitSeed = dailySeedForDate(explicit, config);
 
       expect(utcSeed, explicitSeed);
+    });
+
+    test('preset-backed daily helpers apply resolved bundles', () {
+      const date = DateOnly(2026, 2, 20);
+      final celestialBundle = TriPeaksModeBundle.forPreset(
+        TriPeaksModePreset.celestial,
+      );
+      final session = newDailySessionForPreset(
+        date,
+        namespaceId: 'prod',
+        preset: TriPeaksModePreset.celestial,
+      );
+      final game = newDailyGameForPreset(
+        date,
+        namespaceId: 'prod',
+        preset: TriPeaksModePreset.celestial,
+      );
+
+      expect(
+        session.ruleset.roundsPerGame,
+        celestialBundle.ruleset.roundsPerGame,
+      );
+      expect(
+        session.scoreConfig.toMap(),
+        celestialBundle.scoreConfig.toMap(),
+      );
+      expect(
+        session.roundRulesConfig.toMap(),
+        celestialBundle.roundRulesConfig.toMap(),
+      );
+      expect(session.undoConfig.toMap(), celestialBundle.undoConfig.toMap());
+      expect(
+        session.strikeTimerConfig.toMap(),
+        celestialBundle.strikeTimerConfig.toMap(),
+      );
+      expect(game.scoreConfig.toMap(), celestialBundle.scoreConfig.toMap());
+      expect(
+        game.roundRulesConfig.toMap(),
+        celestialBundle.roundRulesConfig.toMap(),
+      );
     });
   });
 
@@ -2728,6 +2883,63 @@ void main() {
   });
 
   group('Serialization', () {
+    test('mode bundle round-trip preserves classic and celestial bundles', () {
+      final classicDecoded = TriPeaksModeBundle.tryFromMap(
+        TriPeaksModeBundle.classic.toMap(),
+      );
+      final celestialDecoded = TriPeaksModeBundle.tryFromMap(
+        TriPeaksModeBundle.celestial.toMap(),
+      );
+
+      expect(classicDecoded.isSuccess, isTrue);
+      expect(classicDecoded.value, TriPeaksModeBundle.classic);
+      expect(celestialDecoded.isSuccess, isTrue);
+      expect(celestialDecoded.value, TriPeaksModeBundle.celestial);
+    });
+
+    test('mode bundle decode preserves nested values without re-resolving', () {
+      final map = TriPeaksModeBundle.celestial.toMap();
+      final scoreConfig = Map<String, dynamic>.from(
+        map['scoreConfig'] as Map<String, dynamic>,
+      );
+      scoreConfig['pointsDrawFromStock'] = 7;
+      map['scoreConfig'] = scoreConfig;
+
+      final decoded = TriPeaksModeBundle.tryFromMap(map);
+
+      expect(decoded.isSuccess, isTrue);
+      expect(decoded.value!.preset, TriPeaksModePreset.celestial);
+      expect(decoded.value!.scoreConfig.pointsDrawFromStock, 7);
+      expect(
+        decoded.value!.scoreConfig.pointsDrawFromStock,
+        isNot(TriPeaksModeBundle.celestial.scoreConfig.pointsDrawFromStock),
+      );
+    });
+
+    test('mode bundle decode rejects unknown preset id', () {
+      final map = TriPeaksModeBundle.classic.toMap();
+      map['presetId'] = 'unknown';
+
+      final decoded = TriPeaksModeBundle.tryFromMap(map);
+
+      expect(decoded.isSuccess, isFalse);
+      expect(decoded.error?.code, DecodeFailureCode.invalidPayload);
+    });
+
+    test('mode bundle decode rejects invalid nested payload', () {
+      final map = TriPeaksModeBundle.classic.toMap();
+      final scoreConfig = Map<String, dynamic>.from(
+        map['scoreConfig'] as Map<String, dynamic>,
+      );
+      scoreConfig['pointsDrawFromStock'] = 'bad';
+      map['scoreConfig'] = scoreConfig;
+
+      final decoded = TriPeaksModeBundle.tryFromMap(map);
+
+      expect(decoded.isSuccess, isFalse);
+      expect(decoded.error?.code, DecodeFailureCode.invalidPayload);
+    });
+
     test('round result finalScore is backward compatible', () {
       final legacy = RoundResult.tryFromMap(
         <String, dynamic>{

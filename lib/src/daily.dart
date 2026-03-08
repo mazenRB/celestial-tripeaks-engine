@@ -31,6 +31,31 @@ TriPeaksState newDailyGame(
   );
 }
 
+/// Creates a deterministic daily round from a canonical engine preset.
+TriPeaksState newDailyGameForPreset(
+  DateOnly date, {
+  required String namespaceId,
+  required TriPeaksModePreset preset,
+  int schemaVersion = 1,
+}) {
+  final config = DailyChallengeConfig.forPreset(
+    namespaceId: namespaceId,
+    preset: preset,
+    schemaVersion: schemaVersion,
+  );
+  final bundle = TriPeaksModeBundle.forPreset(preset);
+  return newDailyGame(
+    date,
+    config,
+    scoreConfig: bundle.scoreConfig,
+    roundRulesConfig: bundle.roundRulesConfig,
+    undoConfig: bundle.undoConfig,
+    streakConfig: bundle.streakConfig,
+    strikeTimerConfig: bundle.strikeTimerConfig,
+    bonusSlotsConfig: bundle.bonusSlotsConfig,
+  );
+}
+
 /// Creates a deterministic daily session from [date] and [config].
 TriPeaksSessionState newDailySession(
   DateOnly date,
@@ -52,6 +77,33 @@ TriPeaksSessionState newDailySession(
     streakConfig: streakConfig,
     strikeTimerConfig: strikeTimerConfig,
     bonusSlotsConfig: bonusSlotsConfig,
+  );
+}
+
+/// Creates a deterministic daily session from a canonical engine preset.
+TriPeaksSessionState newDailySessionForPreset(
+  DateOnly date, {
+  required String namespaceId,
+  required TriPeaksModePreset preset,
+  int schemaVersion = 1,
+  int? roundCount,
+}) {
+  final bundle = TriPeaksModeBundle.forPreset(preset);
+  final config = DailyChallengeConfig.forPreset(
+    namespaceId: namespaceId,
+    preset: preset,
+    schemaVersion: schemaVersion,
+    roundCount: roundCount ?? bundle.ruleset.roundsPerGame,
+  );
+  return newDailySession(
+    date,
+    config,
+    scoreConfig: bundle.scoreConfig,
+    roundRulesConfig: bundle.roundRulesConfig,
+    undoConfig: bundle.undoConfig,
+    streakConfig: bundle.streakConfig,
+    strikeTimerConfig: bundle.strikeTimerConfig,
+    bonusSlotsConfig: bundle.bonusSlotsConfig,
   );
 }
 

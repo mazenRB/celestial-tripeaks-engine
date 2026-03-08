@@ -21,6 +21,11 @@ This guide focuses on practical integration using the public export surface in
 - `reduceSession(...)`
 - `tryReduceSession(...)`
 
+### Preset Packaging
+
+- `TriPeaksModePreset`
+- `TriPeaksModeBundle`
+
 ### Query/Hint
 
 - `getHint(...)`
@@ -106,6 +111,26 @@ Session score helpers:
 `RoundResult.finalScore` may be `null` for legacy decoded payloads; unknown
 scores are skipped deterministically in cumulative totals.
 
+### Preset-backed Session Setup
+
+```dart
+final bundle = TriPeaksModeBundle.forPreset(TriPeaksModePreset.classic);
+
+final session = TriPeaksSessionState.newSession(
+  ruleset: bundle.ruleset,
+  scoreConfig: bundle.scoreConfig,
+  roundRulesConfig: bundle.roundRulesConfig,
+  undoConfig: bundle.undoConfig,
+  streakConfig: bundle.streakConfig,
+  strikeTimerConfig: bundle.strikeTimerConfig,
+  bonusSlotsConfig: bundle.bonusSlotsConfig,
+);
+```
+
+Serialized `TriPeaksModeBundle` payloads preserve their nested resolved config
+values as written. Decode treats `presetId` as metadata and does not re-resolve
+current catalog defaults.
+
 ### 3) Replay Logging
 
 ```dart
@@ -125,7 +150,20 @@ replay = recorded.replay;
 session = recorded.reduceResult.state;
 ```
 
-### 4) Authority Host Runtime
+### 4) Daily Presets
+
+```dart
+final session = newDailySessionForPreset(
+  const DateOnly(2026, 2, 20),
+  namespaceId: 'prod',
+  preset: TriPeaksModePreset.celestial,
+);
+```
+
+Preset-backed daily helpers derive `modeId` from the engine-owned preset id and
+reuse the resolved bundle configs.
+
+### 5) Authority Host Runtime
 
 - Construct `AuthorityRuntime` with `AuthorityStorePort` implementation and
   baseline `MatchState` (sequence must start at `0`).

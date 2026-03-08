@@ -5,6 +5,19 @@ Last updated: 2026-02-21
 All tunable values below are modeled as config objects and injected into
 state/reducer flows.
 
+## Preset Catalog
+
+The engine exposes canonical named presets through `TriPeaksModePreset` and
+resolved bundles through `TriPeaksModeBundle`.
+
+- `classic` matches the current engine default baseline exactly.
+- `celestial` is an engine-owned custom preset with centralized tuning values.
+
+Bundle serialization stores both `presetId` and the fully resolved nested
+config values. Decode preserves those resolved values exactly and does not
+re-resolve the current preset catalog, so previously serialized bundles remain
+stable if tuning changes later.
+
 ## Round and Session Mechanics
 
 ### `ScoreConfig`
