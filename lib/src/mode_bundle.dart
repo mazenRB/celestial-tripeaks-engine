@@ -19,16 +19,26 @@ final class TriPeaksModeBundle {
     required this.dealPolicyConfig,
   });
 
-  /// Baseline preset that exactly matches current engine defaults.
+  /// Canonical standard-solitaire preset.
   static const TriPeaksModeBundle classic = TriPeaksModeBundle(
     preset: TriPeaksModePreset.classic,
-    ruleset: TriPeaksRuleset.threeRounds,
-    scoreConfig: ScoreConfig(),
-    roundRulesConfig: RoundRulesConfig(),
-    undoConfig: UndoConfig(),
+    ruleset: TriPeaksRuleset.oneRound,
+    scoreConfig: ScoreConfig(
+      pointsTableauToWaste: 4096,
+      penaltyInvalidAction: 20000,
+      pointsPeakCleared: 200000,
+      pointsPerRemainingStockCardOnWin: 50000,
+    ),
+    roundRulesConfig: RoundRulesConfig(
+      aceKingWrapAround: false,
+      startStockSize: 23,
+      stockDecreaseEveryRounds: 999999,
+      minStockSize: 23,
+    ),
+    undoConfig: UndoConfig(enabled: false, maxSteps: 0),
     streakConfig: StreakConfig(),
-    strikeTimerConfig: StrikeTimerConfig(),
-    bonusSlotsConfig: BonusSlotsConfig(),
+    strikeTimerConfig: StrikeTimerConfig(enabled: false),
+    bonusSlotsConfig: BonusSlotsConfig(enabled: false),
     dealPolicyConfig: DealPolicyConfig(),
   );
 

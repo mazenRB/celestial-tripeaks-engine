@@ -10,7 +10,7 @@ state/reducer flows.
 The engine exposes canonical named presets through `TriPeaksModePreset` and
 resolved bundles through `TriPeaksModeBundle`.
 
-- `classic` matches the current engine default baseline exactly.
+- `classic` is the default standard single-round Solitaire TriPeaks preset.
 - `celestial` is an engine-owned custom preset with centralized tuning values.
 - Bundles also include `DealPolicyConfig`, so preset-backed match/server setup
   can reuse deterministic deal selection rules without rebuilding them.
@@ -222,6 +222,7 @@ Risk notes:
 
 Common presets:
 
+- `oneRound`
 - `threeRounds`
 - `sixRounds`
 - `tenRounds`

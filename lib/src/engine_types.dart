@@ -259,12 +259,18 @@ final class TriPeaksSessionReduceResult {
 final class TriPeaksRuleset {
   /// Creates a ruleset with [roundsPerGame].
   ///
-  /// Only `3`, `6`, and `10` are valid values.
+  /// Only `1`, `3`, `6`, and `10` are valid values.
   const TriPeaksRuleset({required this.roundsPerGame})
       : assert(
-          roundsPerGame == 3 || roundsPerGame == 6 || roundsPerGame == 10,
-          'roundsPerGame must be 3, 6, or 10.',
+          roundsPerGame == 1 ||
+              roundsPerGame == 3 ||
+              roundsPerGame == 6 ||
+              roundsPerGame == 10,
+          'roundsPerGame must be 1, 3, 6, or 10.',
         );
+
+  /// Preset ruleset with 1 round.
+  static const TriPeaksRuleset oneRound = TriPeaksRuleset(roundsPerGame: 1);
 
   /// Preset ruleset with 3 rounds.
   static const TriPeaksRuleset threeRounds = TriPeaksRuleset(roundsPerGame: 3);

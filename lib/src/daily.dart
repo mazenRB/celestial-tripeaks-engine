@@ -109,6 +109,8 @@ TriPeaksSessionState newDailySessionForPreset(
 
 TriPeaksRuleset _rulesetFromDailyConfig(DailyChallengeConfig config) {
   switch (config.roundCount) {
+    case 1:
+      return TriPeaksRuleset.oneRound;
     case null:
     case 3:
       return TriPeaksRuleset.threeRounds;
@@ -120,7 +122,7 @@ TriPeaksRuleset _rulesetFromDailyConfig(DailyChallengeConfig config) {
       throw ArgumentError.value(
         config.roundCount,
         'roundCount',
-        'Supported values are 3, 6, or 10.',
+        'Supported values are 1, 3, 6, or 10.',
       );
   }
 }

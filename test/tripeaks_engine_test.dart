@@ -1720,7 +1720,11 @@ void main() {
   });
 
   group('TriPeaks session reducer', () {
-    test('supports 3, 6, and 10 rounds via ruleset', () {
+    test('supports 1, 3, 6, and 10 rounds via ruleset', () {
+      final one = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.oneRound,
+        seed: 1,
+      );
       final three = TriPeaksSessionState.newSession(
         ruleset: TriPeaksRuleset.threeRounds,
         seed: 1,
@@ -1734,6 +1738,7 @@ void main() {
         seed: 1,
       );
 
+      expect(one.ruleset.roundsPerGame, 1);
       expect(three.ruleset.roundsPerGame, 3);
       expect(six.ruleset.roundsPerGame, 6);
       expect(ten.ruleset.roundsPerGame, 10);
@@ -2321,25 +2326,37 @@ void main() {
       expect(TriPeaksModePreset.tryParseModeId('unknown'), isNull);
     });
 
-    test('classic bundle matches current defaults', () {
+    test('classic bundle matches standard solitaire preset', () {
       const bundle = TriPeaksModeBundle.classic;
 
       expect(bundle.preset, TriPeaksModePreset.classic);
-      expect(bundle.ruleset, TriPeaksRuleset.threeRounds);
-      expect(bundle.scoreConfig.toMap(), const ScoreConfig().toMap());
+      expect(bundle.ruleset, TriPeaksRuleset.oneRound);
+      expect(bundle.scoreConfig.pointsTableauToWaste, 4096);
+      expect(bundle.scoreConfig.penaltyInvalidAction, 20000);
+      expect(bundle.scoreConfig.pointsPeakCleared, 200000);
+      expect(bundle.scoreConfig.pointsPerRemainingStockCardOnWin, 50000);
+      expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.streak);
       expect(
         bundle.roundRulesConfig.toMap(),
-        const RoundRulesConfig().toMap(),
+        const RoundRulesConfig(
+          aceKingWrapAround: false,
+          startStockSize: 23,
+          stockDecreaseEveryRounds: 999999,
+          minStockSize: 23,
+        ).toMap(),
       );
-      expect(bundle.undoConfig.toMap(), const UndoConfig().toMap());
+      expect(
+        bundle.undoConfig.toMap(),
+        const UndoConfig(enabled: false, maxSteps: 0).toMap(),
+      );
       expect(bundle.streakConfig.toMap(), const StreakConfig().toMap());
       expect(
         bundle.strikeTimerConfig.toMap(),
-        const StrikeTimerConfig().toMap(),
+        const StrikeTimerConfig(enabled: false).toMap(),
       );
       expect(
         bundle.bonusSlotsConfig.toMap(),
-        const BonusSlotsConfig().toMap(),
+        const BonusSlotsConfig(enabled: false).toMap(),
       );
       expect(
         bundle.dealPolicyConfig.toMap(),
@@ -2522,8 +2539,16 @@ void main() {
 
     test('preset-backed daily helpers apply resolved bundles', () {
       const date = DateOnly(2026, 2, 20);
+      final classicBundle = TriPeaksModeBundle.forPreset(
+        TriPeaksModePreset.classic,
+      );
       final celestialBundle = TriPeaksModeBundle.forPreset(
         TriPeaksModePreset.celestial,
+      );
+      final classicSession = newDailySessionForPreset(
+        date,
+        namespaceId: 'prod',
+        preset: TriPeaksModePreset.classic,
       );
       final session = newDailySessionForPreset(
         date,
@@ -2536,6 +2561,10 @@ void main() {
         preset: TriPeaksModePreset.celestial,
       );
 
+      expect(
+        classicSession.ruleset.roundsPerGame,
+        classicBundle.ruleset.roundsPerGame,
+      );
       expect(
         session.ruleset.roundsPerGame,
         celestialBundle.ruleset.roundsPerGame,

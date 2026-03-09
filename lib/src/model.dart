@@ -383,7 +383,7 @@ final class DailyChallengeConfig {
 
   /// Optional number of rounds for session challenges.
   ///
-  /// Supported values are currently `3`, `6`, and `10`.
+  /// Supported values are currently `1`, `3`, `6`, and `10`.
   final int? roundCount;
 
   /// Serializes config to JSON-friendly map.
