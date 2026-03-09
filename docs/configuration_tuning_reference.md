@@ -12,6 +12,8 @@ resolved bundles through `TriPeaksModeBundle`.
 
 - `classic` matches the current engine default baseline exactly.
 - `celestial` is an engine-owned custom preset with centralized tuning values.
+- Bundles also include `DealPolicyConfig`, so preset-backed match/server setup
+  can reuse deterministic deal selection rules without rebuilding them.
 
 Bundle serialization stores both `presetId` and the fully resolved nested
 config values. Decode preserves those resolved values exactly and does not

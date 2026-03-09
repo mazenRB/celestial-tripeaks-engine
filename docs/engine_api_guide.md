@@ -131,6 +131,9 @@ Serialized `TriPeaksModeBundle` payloads preserve their nested resolved config
 values as written. Decode treats `presetId` as metadata and does not re-resolve
 current catalog defaults.
 
+`TriPeaksModeBundle` also carries `dealPolicyConfig` for server/match/deal
+generation reuse.
+
 ### 3) Replay Logging
 
 ```dart

@@ -16,6 +16,7 @@ final class TriPeaksModeBundle {
     required this.streakConfig,
     required this.strikeTimerConfig,
     required this.bonusSlotsConfig,
+    required this.dealPolicyConfig,
   });
 
   /// Baseline preset that exactly matches current engine defaults.
@@ -28,6 +29,7 @@ final class TriPeaksModeBundle {
     streakConfig: StreakConfig(),
     strikeTimerConfig: StrikeTimerConfig(),
     bonusSlotsConfig: BonusSlotsConfig(),
+    dealPolicyConfig: DealPolicyConfig(),
   );
 
   // Centralized celestial tuning values. Adjust here when balancing changes.
@@ -35,11 +37,14 @@ final class TriPeaksModeBundle {
     preset: TriPeaksModePreset.celestial,
     ruleset: TriPeaksRuleset.tenRounds,
     scoreConfig: const ScoreConfig(
+      pointsTableauToWaste: 4096,
+      penaltyInvalidAction: 20000,
+      pointsPeakCleared: 200000,
+      pointsPerRemainingStockCardOnWin: 50000,
       multiplierMode: ScoreMultiplierMode.timeBonus,
       timeBonusSecondsPerMove: 2,
       timeBonusMaxSeconds: 10,
       roundBasePointsGrowthBps: 1000,
-      pointsPerRemainingStockCardOnWin: 100,
     ),
     roundRulesConfig: const RoundRulesConfig(
       startStockSize: 21,
@@ -50,10 +55,17 @@ final class TriPeaksModeBundle {
     streakConfig: const StreakConfig(),
     strikeTimerConfig: const StrikeTimerConfig(enabled: false),
     bonusSlotsConfig: const BonusSlotsConfig(
+      spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
       spawnOnOpenSlot2AtStreak: 3,
       spawnOnOpenSlot3AtStreak: 8,
       closeOnDraw: true,
       closeOnInvalidAction: true,
+    ),
+    dealPolicyConfig: const DealPolicyConfig(
+      mode: DealPolicyMode.requireSolvable,
+      maxAttempts: 200,
+      attemptSeedStrategy: AttemptSeedStrategy.fnv1aMix,
+      solverNodeLimit: 300000,
     ),
   );
 
@@ -89,6 +101,9 @@ final class TriPeaksModeBundle {
   /// Bonus slots config.
   final BonusSlotsConfig bonusSlotsConfig;
 
+  /// Deal policy config.
+  final DealPolicyConfig dealPolicyConfig;
+
   /// Serializes the bundle to a JSON-friendly map.
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -102,6 +117,7 @@ final class TriPeaksModeBundle {
       'streakConfig': streakConfig.toMap(),
       'strikeTimerConfig': strikeTimerConfig.toMap(),
       'bonusSlotsConfig': bonusSlotsConfig.toMap(),
+      'dealPolicyConfig': dealPolicyConfig.toMap(),
     };
   }
 
@@ -133,6 +149,7 @@ final class TriPeaksModeBundle {
     final streakConfigMap = map['streakConfig'];
     final strikeTimerConfigMap = map['strikeTimerConfig'];
     final bonusSlotsConfigMap = map['bonusSlotsConfig'];
+    final dealPolicyConfigMap = map['dealPolicyConfig'];
     if (presetId is! String ||
         rulesetMap is! Map<String, dynamic> ||
         scoreConfigMap is! Map<String, dynamic> ||
@@ -140,7 +157,8 @@ final class TriPeaksModeBundle {
         undoConfigMap is! Map<String, dynamic> ||
         streakConfigMap is! Map<String, dynamic> ||
         strikeTimerConfigMap is! Map<String, dynamic> ||
-        bonusSlotsConfigMap is! Map<String, dynamic>) {
+        bonusSlotsConfigMap is! Map<String, dynamic> ||
+        dealPolicyConfigMap is! Map<String, dynamic>) {
       return const DecodeResult.failure(
         DecodeFailure(
           code: DecodeFailureCode.invalidPayload,
@@ -188,6 +206,11 @@ final class TriPeaksModeBundle {
     if (!bonusSlotsConfigResult.isSuccess) {
       return DecodeResult.failure(bonusSlotsConfigResult.error!);
     }
+    final dealPolicyConfigResult =
+        DealPolicyConfig.tryFromMap(dealPolicyConfigMap);
+    if (!dealPolicyConfigResult.isSuccess) {
+      return DecodeResult.failure(dealPolicyConfigResult.error!);
+    }
     return DecodeResult.success(
       TriPeaksModeBundle(
         preset: preset,
@@ -198,6 +221,7 @@ final class TriPeaksModeBundle {
         streakConfig: streakConfigResult.value!,
         strikeTimerConfig: strikeTimerConfigResult.value!,
         bonusSlotsConfig: bonusSlotsConfigResult.value!,
+        dealPolicyConfig: dealPolicyConfigResult.value!,
       ),
     );
   }
@@ -222,7 +246,9 @@ final class TriPeaksModeBundle {
         _canonicalBundleMap(other.strikeTimerConfig.toMap()) ==
             _canonicalBundleMap(strikeTimerConfig.toMap()) &&
         _canonicalBundleMap(other.bonusSlotsConfig.toMap()) ==
-            _canonicalBundleMap(bonusSlotsConfig.toMap());
+            _canonicalBundleMap(bonusSlotsConfig.toMap()) &&
+        _canonicalBundleMap(other.dealPolicyConfig.toMap()) ==
+            _canonicalBundleMap(dealPolicyConfig.toMap());
   }
 
   @override
@@ -235,6 +261,7 @@ final class TriPeaksModeBundle {
         _canonicalBundleMap(streakConfig.toMap()),
         _canonicalBundleMap(strikeTimerConfig.toMap()),
         _canonicalBundleMap(bonusSlotsConfig.toMap()),
+        _canonicalBundleMap(dealPolicyConfig.toMap()),
       );
 }
 

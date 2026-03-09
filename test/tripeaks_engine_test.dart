@@ -2341,6 +2341,10 @@ void main() {
         bundle.bonusSlotsConfig.toMap(),
         const BonusSlotsConfig().toMap(),
       );
+      expect(
+        bundle.dealPolicyConfig.toMap(),
+        const DealPolicyConfig().toMap(),
+      );
     });
 
     test('celestial bundle is fully populated and distinct', () {
@@ -2350,12 +2354,27 @@ void main() {
 
       expect(bundle.preset, TriPeaksModePreset.celestial);
       expect(bundle.ruleset, TriPeaksRuleset.tenRounds);
+      expect(bundle.scoreConfig.pointsTableauToWaste, 4096);
+      expect(bundle.scoreConfig.penaltyInvalidAction, 20000);
+      expect(bundle.scoreConfig.pointsPeakCleared, 200000);
+      expect(bundle.scoreConfig.pointsPerRemainingStockCardOnWin, 50000);
       expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.timeBonus);
       expect(bundle.roundRulesConfig.minStockSize, 16);
       expect(bundle.undoConfig.enabled, isFalse);
       expect(bundle.strikeTimerConfig.enabled, isFalse);
+      expect(
+        bundle.bonusSlotsConfig.spawnPolicy,
+        BonusSlotSpawnPolicy.tierRandomRank,
+      );
       expect(bundle.bonusSlotsConfig.spawnOnOpenSlot2AtStreak, 3);
       expect(bundle.bonusSlotsConfig.spawnOnOpenSlot3AtStreak, 8);
+      expect(bundle.dealPolicyConfig.mode, DealPolicyMode.requireSolvable);
+      expect(
+        bundle.dealPolicyConfig.attemptSeedStrategy,
+        AttemptSeedStrategy.fnv1aMix,
+      );
+      expect(bundle.dealPolicyConfig.maxAttempts, 200);
+      expect(bundle.dealPolicyConfig.solverNodeLimit, 300000);
       expect(bundle, isNot(TriPeaksModeBundle.classic));
     });
 
@@ -2396,6 +2415,7 @@ void main() {
         streakConfig: bundle.streakConfig,
         strikeTimerConfig: bundle.strikeTimerConfig,
         bonusSlotsConfig: bundle.bonusSlotsConfig,
+        dealPolicyConfig: bundle.dealPolicyConfig,
       );
 
       expect(session.ruleset, bundle.ruleset);
@@ -2404,6 +2424,10 @@ void main() {
       expect(replay.scoreConfig.toMap(), bundle.scoreConfig.toMap());
       expect(match.ruleset, bundle.ruleset);
       expect(match.scoreConfig.toMap(), bundle.scoreConfig.toMap());
+      expect(
+        match.dealPolicyConfig.toMap(),
+        bundle.dealPolicyConfig.toMap(),
+      );
     });
   });
 
