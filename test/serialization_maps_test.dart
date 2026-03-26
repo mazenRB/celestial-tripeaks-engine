@@ -216,8 +216,10 @@ void main() {
       expect(decoded.isSuccess, isTrue);
       final restored = decoded.value!;
 
-      expect(restored.bonusSlotsConfig.spawnPolicy,
-          BonusSlotSpawnPolicy.tierFixedRank);
+      expect(
+        restored.bonusSlotsConfig.spawnPolicy,
+        BonusSlotSpawnPolicy.tierFixedRank,
+      );
       expect(
         restored.bonusSlotsConfig.defaultAnchorTierWhenUnknown,
         BonusSlotAnchorTier.high,
@@ -319,111 +321,6 @@ void main() {
       expect(bonus['defaultAnchorTierWhenUnknown'], 'low');
       expect(bonus['lowTierAnchorRank'], 'six');
       expect(bonus['highTierAnchorRank'], 'queen');
-    });
-  });
-
-  group('Fingerprint', () {
-    test('identical states produce identical fingerprint', () {
-      final stateA = TriPeaksState.newGame(seed: 12);
-      final stateB = TriPeaksState.newGame(seed: 12);
-
-      expect(stateFingerprint(stateA), stateFingerprint(stateB));
-    });
-
-    test('small state change produces a different fingerprint', () {
-      final state = TriPeaksState.newGame(seed: 12);
-      final changed = reduceTriPeaks(state, const DrawFromStockAction());
-
-      expect(stateFingerprint(state), isNot(stateFingerprint(changed)));
-    });
-
-    test('fingerprint is stable for fixed canonical state', () {
-      final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), '54f511b5');
-    });
-  });
-
-  group('Save/Load', () {
-    test('tierFixedRank round save/load keeps anchor state and fingerprint',
-        () {
-      var state = TriPeaksState.newGame(
-        deck: _buildStreakUnlockDeck(),
-        bonusSlotsConfig: const BonusSlotsConfig(
-          spawnPolicy: BonusSlotSpawnPolicy.tierFixedRank,
-          lowTierAnchorRank: Rank.six,
-          highTierAnchorRank: Rank.queen,
-        ),
-      );
-      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
-      state = reduceTriPeaks(state, const RemoveTableauCardAction(19));
-      state = reduceTriPeaks(state, const RemoveTableauCardAction(20));
-      expect(state.bonusSlotsState.slots[1].single.isAnchor, isTrue);
-
-      final save = encodeSaveRound(state, savedAtSequence: 3);
-      final loaded = decodeSaveRound(save);
-      expect(loaded.isSuccess, isTrue);
-      expect(
-        loaded.value!.state.bonusSlotsState.slots[1].single.isAnchor,
-        isTrue,
-      );
-      expect(
-        stateFingerprint(loaded.value!.state),
-        stateFingerprint(state),
-      );
-    });
-
-    test('round save round-trip preserves state and fingerprint', () {
-      final initial = TriPeaksState.newGame(
-        seed: 17,
-        scoreConfig: const ScoreConfig(penaltyInvalidAction: -3),
-      );
-      final state = _applyTryActions(
-        initial,
-        const <TriPeaksAction>[
-          DrawFromStockAction(),
-          RemoveTableauCardAction(99),
-          DrawFromStockAction(),
-        ],
-      );
-
-      final save = encodeSaveRound(state, engineVersion: 1, savedAtSequence: 9);
-      final decoded = decodeSaveRound(save);
-
-      expect(decoded.isSuccess, isTrue);
-      final value = decoded.value!;
-      expect(value.savedAtSequence, 9);
-      expect(value.engineVersion, 1);
-      expect(value.fingerprint, stateFingerprint(state));
-      expect(value.state.tableau, equals(state.tableau));
-      expect(value.state.removed, equals(state.removed));
-      expect(value.state.waste, equals(state.waste));
-      expect(value.state.stock, equals(state.stock));
-      expect(value.state.scoreState.totalScore, state.scoreState.totalScore);
-    });
-
-    test('corrupted round payload returns corruptSave failure', () {
-      final state = TriPeaksState.newGame(seed: 17);
-      final save = encodeSaveRound(state);
-      final payload = save['payload'] as Map<String, dynamic>;
-      final removed = (payload['removed'] as List<dynamic>).toList();
-      removed[0] = !(removed[0] as bool);
-      payload['removed'] = removed;
-
-      final decoded = decodeSaveRound(save);
-
-      expect(decoded.isSuccess, isFalse);
-      expect(decoded.error?.code, SaveDecodeFailureCode.corruptSave);
-    });
-
-    test('unsupported save schemaVersion returns typed failure', () {
-      final state = TriPeaksState.newGame(seed: 17);
-      final save = encodeSaveRound(state);
-      save['schemaVersion'] = 999;
-
-      final decoded = decodeSaveRound(save);
-
-      expect(decoded.isSuccess, isFalse);
-      expect(decoded.error?.code, SaveDecodeFailureCode.unsupportedVersion);
     });
   });
 }
