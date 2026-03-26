@@ -1,146 +1,5 @@
 part of '../tripeaks_engine.dart';
 
-/// Host-provided context for one authority apply attempt.
-final class AuthorityRequestContext {
-  /// Creates request context.
-  const AuthorityRequestContext({
-    required this.subjectId,
-    required this.playerId,
-  });
-
-  /// Authenticated identity from host auth boundary.
-  final String subjectId;
-
-  /// Server-resolved player id authorized for this match.
-  final String playerId;
-}
-
-/// In-memory runtime state owned by [AuthorityRuntime].
-final class AuthorityRuntimeState {
-  /// Creates runtime state.
-  const AuthorityRuntimeState({
-    required this.matchState,
-    required this.recentClientEventIdsByPlayer,
-    required this.lastAcceptedClientSeqByPlayer,
-    required this.idCapacityPerPlayer,
-  });
-
-  /// Creates baseline runtime state with authoritative sequence at 0.
-  factory AuthorityRuntimeState.newBaseline({
-    required MatchState matchState,
-    required int idCapacityPerPlayer,
-  }) {
-    return AuthorityRuntimeState(
-      matchState: matchState,
-      recentClientEventIdsByPlayer: const <String, List<String>>{},
-      lastAcceptedClientSeqByPlayer: const <String, int>{},
-      idCapacityPerPlayer: idCapacityPerPlayer,
-    );
-  }
-
-  /// Authoritative match state.
-  final MatchState matchState;
-
-  /// Recent accepted client event IDs by player.
-  final Map<String, List<String>> recentClientEventIdsByPlayer;
-
-  /// Last accepted client sequence by player.
-  final Map<String, int> lastAcceptedClientSeqByPlayer;
-
-  /// Per-player ring capacity.
-  final int idCapacityPerPlayer;
-
-  AuthorityRuntimeState _copyWith({
-    MatchState? matchState,
-    Map<String, List<String>>? recentClientEventIdsByPlayer,
-    Map<String, int>? lastAcceptedClientSeqByPlayer,
-  }) {
-    return AuthorityRuntimeState(
-      matchState: matchState ?? this.matchState,
-      recentClientEventIdsByPlayer: Map<String, List<String>>.unmodifiable(
-        (recentClientEventIdsByPlayer ?? this.recentClientEventIdsByPlayer).map(
-          (key, value) => MapEntry(key, List<String>.unmodifiable(value)),
-        ),
-      ),
-      lastAcceptedClientSeqByPlayer: Map<String, int>.unmodifiable(
-        lastAcceptedClientSeqByPlayer ?? this.lastAcceptedClientSeqByPlayer,
-      ),
-      idCapacityPerPlayer: idCapacityPerPlayer,
-    );
-  }
-}
-
-/// Runtime apply result with duplicate and resync hints.
-final class AuthorityApplyResult {
-  /// Creates authority runtime apply result.
-  const AuthorityApplyResult({
-    required this.status,
-    required this.state,
-    required this.authoritativeSequence,
-    this.failure,
-    this.rejectReason,
-    this.lastAcceptedClientSeq,
-    this.mustFullyResync = false,
-  });
-
-  /// Outcome status.
-  final ServerApplyStatus status;
-
-  /// Updated runtime state.
-  final AuthorityRuntimeState state;
-
-  /// Current authoritative sequence after the attempt.
-  final int authoritativeSequence;
-
-  /// Typed failure details for rejected outcomes.
-  final AuthorityApplyFailure? failure;
-
-  /// Reject reason mapped from server rules when available.
-  final ServerRejectReason? rejectReason;
-
-  /// Last accepted client sequence for this player, when known.
-  final int? lastAcceptedClientSeq;
-
-  /// Whether client should perform full resync.
-  final bool mustFullyResync;
-
-  /// Whether the event was accepted.
-  bool get accepted => status == ServerApplyStatus.accepted;
-
-  /// Whether the event was duplicate and ignored.
-  bool get duplicateIgnored => status == ServerApplyStatus.duplicateIgnored;
-
-  /// Whether the result is rejected.
-  bool get rejected => status == ServerApplyStatus.rejected;
-}
-
-/// Runtime restore result.
-final class AuthorityRestoreResult {
-  /// Creates restore result.
-  const AuthorityRestoreResult({
-    required this.isSuccess,
-    required this.state,
-    required this.snapshotSeq,
-    this.failure,
-    this.usedSnapshotFallback = false,
-  });
-
-  /// Whether restore was successful.
-  final bool isSuccess;
-
-  /// Restored runtime state.
-  final AuthorityRuntimeState state;
-
-  /// Snapshot sequence used as replay starting boundary.
-  final int snapshotSeq;
-
-  /// Failure details when restore fails.
-  final AuthorityRestoreFailure? failure;
-
-  /// Whether invalid snapshot fallback was used.
-  final bool usedSnapshotFallback;
-}
-
 /// Orchestrates durability and restore around pure deterministic reducers.
 final class AuthorityRuntime {
   /// Creates a runtime for one authoritative match stream.
@@ -196,12 +55,13 @@ final class AuthorityRuntime {
     try {
       final snapshot = await store.loadLatestSnapshot(matchId);
       if (snapshot != null) {
-        final snapshotValidation = _validateSnapshot(matchId, snapshot);
+        final snapshotValidation =
+            _authorityValidateSnapshot(matchId, snapshot);
         if (snapshotValidation == null) {
           snapshotSeq = snapshot.authoritativeSequence;
           working = AuthorityRuntimeState(
             matchState: snapshot.matchState,
-            recentClientEventIdsByPlayer: _cloneRecentIds(
+            recentClientEventIdsByPlayer: _authorityCloneRecentIds(
               snapshot.recentClientEventIdsByPlayer,
               config.processedClientEventIdsCapacityPerPlayer,
             ),
@@ -270,7 +130,7 @@ final class AuthorityRuntime {
     var expected = snapshotSeq + 1;
     var current = working;
     for (final persisted in tail) {
-      final validation = _validatePersistedEvent(
+      final validation = _authorityValidatePersistedEvent(
         persisted,
         expectedSequence: expected,
         matchId: matchId,
@@ -419,7 +279,9 @@ final class AuthorityRuntime {
 
     try {
       await store.appendAcceptedEvent(
-          _state.matchState.config.matchId, persisted);
+        _state.matchState.config.matchId,
+        persisted,
+      );
     } on Object catch (error) {
       return _rejectedResult(
         AuthorityApplyFailure(
@@ -554,94 +416,6 @@ final class AuthorityRuntime {
         event: event,
       ),
     );
-  }
-
-  AuthorityRestoreFailure? _validateSnapshot(
-    String matchId,
-    PersistedAuthoritySnapshot snapshot,
-  ) {
-    if (snapshot.matchId != matchId) {
-      return const AuthorityRestoreFailure(
-        code: AuthorityRestoreFailureCode.matchIdMismatch,
-        message: 'Snapshot matchId does not match restore target.',
-      );
-    }
-    if (snapshot.schemaVersion != _serializationSchemaV1) {
-      return const AuthorityRestoreFailure(
-        code: AuthorityRestoreFailureCode.snapshotInvalid,
-        message: 'Snapshot schemaVersion is unsupported.',
-      );
-    }
-    if (snapshot.matchState.config.matchId != matchId ||
-        snapshot.matchState.authoritativeSequence !=
-            snapshot.authoritativeSequence) {
-      return const AuthorityRestoreFailure(
-        code: AuthorityRestoreFailureCode.snapshotInvalid,
-        message: 'Snapshot payload is inconsistent.',
-      );
-    }
-    if (snapshot.engineVersion != snapshot.matchState.engineVersion) {
-      return const AuthorityRestoreFailure(
-        code: AuthorityRestoreFailureCode.snapshotInvalid,
-        message: 'Snapshot engineVersion mismatch.',
-      );
-    }
-    return null;
-  }
-
-  AuthorityRestoreFailure? _validatePersistedEvent(
-    PersistedAuthorityEvent event, {
-    required int expectedSequence,
-    required String matchId,
-  }) {
-    if (event.schemaVersion != _serializationSchemaV1) {
-      return const AuthorityRestoreFailure(
-        code: AuthorityRestoreFailureCode.invalidPersistedEvent,
-        message: 'Persisted event schemaVersion is unsupported.',
-      );
-    }
-    if (event.matchId != matchId ||
-        event.clientEvent.matchId != matchId ||
-        event.serverRecord.clientEvent.matchId != matchId) {
-      return const AuthorityRestoreFailure(
-        code: AuthorityRestoreFailureCode.matchIdMismatch,
-        message: 'Persisted event matchId mismatch.',
-      );
-    }
-    if (event.authoritativeSequence != expectedSequence) {
-      return const AuthorityRestoreFailure(
-        code: AuthorityRestoreFailureCode.sequenceGap,
-        message: 'Persisted accepted events must be strictly contiguous.',
-      );
-    }
-    if (!event.serverRecord.accepted ||
-        event.serverRecord.authoritativeSequence !=
-            event.authoritativeSequence ||
-        event.serverRecord.clientEvent.clientEventId != event.clientEventId ||
-        event.serverRecord.clientEvent.clientSeq != event.clientSeq ||
-        event.serverRecord.clientEvent.playerId != event.playerId) {
-      return const AuthorityRestoreFailure(
-        code: AuthorityRestoreFailureCode.invalidPersistedEvent,
-        message: 'Persisted accepted event metadata is inconsistent.',
-      );
-    }
-    return null;
-  }
-
-  static Map<String, List<String>> _cloneRecentIds(
-    Map<String, List<String>> input,
-    int capacity,
-  ) {
-    return input.map(
-      (key, value) => MapEntry(key, _trimFifo(value, capacity)),
-    );
-  }
-
-  static List<String> _trimFifo(List<String> values, int capacity) {
-    if (values.length <= capacity) {
-      return List<String>.from(values);
-    }
-    return values.sublist(values.length - capacity);
   }
 
   AuthorityRuntimeState _applyAcceptedMetadata(
