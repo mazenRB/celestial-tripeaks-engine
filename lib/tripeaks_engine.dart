@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:math';
 
 part 'src/model.dart';
+part 'src/model_daily.dart';
 part 'src/round_config.dart';
 part 'src/round_config_score.dart';
 part 'src/round_config_streak.dart';
@@ -25,8 +26,10 @@ part 'src/round_state.dart';
 part 'src/round_state_queries.dart';
 part 'src/round_state_decode.dart';
 part 'src/session_state.dart';
+part 'src/session_state_decode.dart';
 part 'src/daily.dart';
 part 'src/deal_policy.dart';
+part 'src/deal_policy_solver.dart';
 part 'src/replay.dart';
 part 'src/replay_models.dart';
 part 'src/replay_runtime.dart';
