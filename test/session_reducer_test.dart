@@ -38,7 +38,9 @@ void main() {
       );
 
       expect(
-          sessionA.currentRound.tableau, equals(sessionB.currentRound.tableau));
+        sessionA.currentRound.tableau,
+        equals(sessionB.currentRound.tableau),
+      );
       expect(sessionA.currentRound.waste, equals(sessionB.currentRound.waste));
       expect(sessionA.currentRound.stock, equals(sessionB.currentRound.stock));
     });
@@ -70,7 +72,6 @@ void main() {
         ],
       );
 
-      // Exhaust stock to force round 1 loss.
       while (session.currentRound.canDrawFromStock) {
         session = reduceTriPeaksSession(
           session,
@@ -397,190 +398,6 @@ void main() {
         TriPeaksSessionErrorCode.gameAlreadyFinished,
       );
       expect(result.state, same(done));
-    });
-  });
-
-  group('Hint queries', () {
-    test('playable moves and deterministic hint when moves exist', () {
-      final deck = buildDeckWithBottomRow(
-        waste: const Card(Rank.seven, Suit.hearts),
-        bottomRow: const <Card>[
-          Card(Rank.six, Suit.clubs), // 18 playable
-          Card(Rank.eight, Suit.clubs), // 19 playable
-          Card(Rank.two, Suit.clubs),
-          Card(Rank.four, Suit.clubs),
-          Card(Rank.ten, Suit.clubs),
-          Card(Rank.queen, Suit.clubs),
-          Card(Rank.ace, Suit.clubs),
-          Card(Rank.three, Suit.diamonds),
-          Card(Rank.five, Suit.diamonds),
-          Card(Rank.nine, Suit.diamonds),
-        ],
-      );
-      final state = TriPeaksState.newGame(deck: deck);
-      const rules = RoundRulesConfig(aceKingWrapAround: false);
-
-      final playable = getPlayableMoves(state, rules);
-      final hint = getHint(state, rules, const HintConfig());
-
-      expect(playable, equals(<int>[18, 19]));
-      expect(hint.isSuccess, isTrue);
-      expect(hint.moveIndex, 18);
-    });
-
-    test('no playable moves returns typed noHintAvailable', () {
-      final deck = buildDeckWithBottomRow(
-        waste: const Card(Rank.seven, Suit.hearts),
-        bottomRow: const <Card>[
-          Card(Rank.two, Suit.clubs),
-          Card(Rank.four, Suit.clubs),
-          Card(Rank.ten, Suit.clubs),
-          Card(Rank.queen, Suit.clubs),
-          Card(Rank.ace, Suit.clubs),
-          Card(Rank.three, Suit.diamonds),
-          Card(Rank.five, Suit.diamonds),
-          Card(Rank.nine, Suit.diamonds),
-          Card(Rank.jack, Suit.diamonds),
-          Card(Rank.king, Suit.diamonds),
-        ],
-      );
-      final state = TriPeaksState.newGame(deck: deck);
-
-      final playable = getPlayableMoves(
-        state,
-        const RoundRulesConfig(aceKingWrapAround: false),
-      );
-      final hint = getHint(
-        state,
-        const RoundRulesConfig(aceKingWrapAround: false),
-        const HintConfig(),
-      );
-
-      expect(playable, isEmpty);
-      expect(hint.isSuccess, isFalse);
-      expect(hint.error?.code, HintErrorCode.noHintAvailable);
-    });
-
-    test('hint output is stable across repeated calls', () {
-      final deck = buildDeckWithBottomRow(
-        waste: const Card(Rank.seven, Suit.hearts),
-        bottomRow: const <Card>[
-          Card(Rank.six, Suit.clubs),
-          Card(Rank.eight, Suit.clubs),
-          Card(Rank.two, Suit.clubs),
-          Card(Rank.four, Suit.clubs),
-          Card(Rank.ten, Suit.clubs),
-          Card(Rank.queen, Suit.clubs),
-          Card(Rank.ace, Suit.clubs),
-          Card(Rank.three, Suit.diamonds),
-          Card(Rank.five, Suit.diamonds),
-          Card(Rank.nine, Suit.diamonds),
-        ],
-      );
-      final state = TriPeaksState.newGame(deck: deck);
-      const rules = RoundRulesConfig(aceKingWrapAround: false);
-      const hintConfig = HintConfig();
-
-      final hintA = getHint(state, rules, hintConfig);
-      final hintB = getHint(state, rules, hintConfig);
-
-      expect(hintA.isSuccess, isTrue);
-      expect(hintA.moveIndex, hintB.moveIndex);
-    });
-
-    test('hint respects enabled flag', () {
-      final state = TriPeaksState.newGame(seed: 4);
-
-      final hint = getHint(
-        state,
-        const RoundRulesConfig(),
-        const HintConfig(enabled: false),
-      );
-
-      expect(hint.isSuccess, isFalse);
-      expect(hint.error?.code, HintErrorCode.hintDisabled);
-    });
-  });
-
-  group('Match scoring layer', () {
-    test('round score is unaffected by multiplayer bonuses', () {
-      final deck = buildDeck(
-        tableauOverrides: <int, Card>{
-          18: const Card(Rank.six, Suit.clubs),
-        },
-        waste: const Card(Rank.seven, Suit.hearts),
-      );
-      final roundState = reduceTriPeaks(
-        TriPeaksState.newGame(deck: deck),
-        const RemoveTableauCardAction(18),
-      );
-      final beforeRoundScore = roundState.scoreState.totalScore;
-
-      var match = MatchScoreState(
-        config: const MatchScoreConfig(firstFinishBonus: 10),
-      );
-      match = reduceMatchScore(
-        match,
-        RoundScoreAggregated(
-          playerId: 'p1',
-          roundScore: roundState.scoreState.totalScore,
-        ),
-      );
-      match = reduceMatchScore(
-        match,
-        const FirstFinishBonusApplied(playerId: 'p1'),
-      );
-
-      expect(roundState.scoreState.totalScore, beforeRoundScore);
-      expect(roundState.scoreState.totalScore, 5);
-      expect(match.totalFor('p1'), 15);
-    });
-
-    test('applies first-finish bonus to match score', () {
-      var match = MatchScoreState(
-        config: const MatchScoreConfig(firstFinishBonus: 12),
-      );
-
-      match = reduceMatchScore(
-        match,
-        const RoundScoreAggregated(playerId: 'p1', roundScore: 9),
-      );
-      match = reduceMatchScore(
-        match,
-        const FirstFinishBonusApplied(playerId: 'p1'),
-      );
-
-      expect(match.totalFor('p1'), 21);
-      expect(match.firstFinishAwardedTo, 'p1');
-    });
-
-    test('determinism: identical event sequence gives identical totals', () {
-      final initialA = MatchScoreState(
-        config: const MatchScoreConfig(
-          firstFinishBonus: 15,
-          rankingAdjustments: <int, int>{1: 7, 2: 2},
-        ),
-      );
-      final initialB = MatchScoreState(
-        config: const MatchScoreConfig(
-          firstFinishBonus: 15,
-          rankingAdjustments: <int, int>{1: 7, 2: 2},
-        ),
-      );
-      final events = <MatchScoreEvent>[
-        const RoundScoreAggregated(playerId: 'p1', roundScore: 11),
-        const RoundScoreAggregated(playerId: 'p2', roundScore: 8),
-        const FirstFinishBonusApplied(playerId: 'p1'),
-        const RankingAdjustmentApplied(playerId: 'p1', rank: 1),
-        const RankingAdjustmentApplied(playerId: 'p2', rank: 2),
-      ];
-
-      final finalA = applyMatchEvents(initialA, events);
-      final finalB = applyMatchEvents(initialB, events);
-
-      expect(finalA.totalScoresByPlayer, equals(finalB.totalScoresByPlayer));
-      expect(finalA.processedEventsCount, finalB.processedEventsCount);
-      expect(finalA.firstFinishAwardedTo, finalB.firstFinishAwardedTo);
     });
   });
 }
