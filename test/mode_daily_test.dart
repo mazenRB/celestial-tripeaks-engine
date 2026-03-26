@@ -84,7 +84,7 @@ void main() {
       expect(bundle.strikeTimerConfig.enabled, isFalse);
       expect(
         bundle.bonusSlotsConfig.spawnPolicy,
-        BonusSlotSpawnPolicy.tierRandomRank,
+        BonusSlotSpawnPolicy.stockTopCard,
       );
       expect(bundle.bonusSlotsConfig.spawnOnOpenSlot2AtStreak, 3);
       expect(bundle.bonusSlotsConfig.spawnOnOpenSlot3AtStreak, 8);

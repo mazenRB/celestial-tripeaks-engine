@@ -65,7 +65,7 @@ final class TriPeaksModeBundle {
     streakConfig: const StreakConfig(),
     strikeTimerConfig: const StrikeTimerConfig(enabled: false),
     bonusSlotsConfig: const BonusSlotsConfig(
-      spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+      spawnPolicy: BonusSlotSpawnPolicy.stockTopCard,
       spawnOnOpenSlot2AtStreak: 3,
       spawnOnOpenSlot3AtStreak: 8,
       closeOnDraw: true,
