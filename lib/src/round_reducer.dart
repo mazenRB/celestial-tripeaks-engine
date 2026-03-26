@@ -273,10 +273,12 @@ TriPeaksReduceResult tryReduceTriPeaks(
         state.tableau[index].rank,
         state.roundSeed,
         state.bonusAnchorSpawnNonce,
+        state.stock,
       );
       return (
         state: state._copyWith(
           removed: nextRemoved,
+          stock: spawnResult.stock,
           scoreState: state.scoreState.applyDelta(
             delta,
             appliedMultiplier: appliedMultiplier,
@@ -583,10 +585,14 @@ BonusSlotsState _withRecomputedOpenSlots(
   StreakState streakState,
 ) {
   final openSlotsCount = _computeOpenSlotsCount(streakState, config);
+  if (config.spawnPolicy == BonusSlotSpawnPolicy.stockTopCard &&
+      openSlotsCount > state.openSlotsCount) {
+    return state;
+  }
   return _withOpenSlotsCount(state, openSlotsCount);
 }
 
-({BonusSlotsState bonusSlotsState, int nextSpawnNonce})
+({BonusSlotsState bonusSlotsState, int nextSpawnNonce, List<Card> stock})
     _withRecomputedOpenSlotsAndSpawn(
   BonusSlotsState state,
   BonusSlotsConfig config,
@@ -594,12 +600,14 @@ BonusSlotsState _withRecomputedOpenSlots(
   Rank? lastSuccessfulTableauRank,
   int roundSeed,
   int spawnNonce,
+  List<Card> stock,
 ) {
   final openSlotsCount = _computeOpenSlotsCount(streakState, config);
   if (openSlotsCount <= state.openSlotsCount) {
     return (
       bonusSlotsState: _withOpenSlotsCount(state, openSlotsCount),
       nextSpawnNonce: spawnNonce,
+      stock: stock,
     );
   }
 
@@ -608,33 +616,47 @@ BonusSlotsState _withRecomputedOpenSlots(
     List<Card>.from(state.slots[1]),
     List<Card>.from(state.slots[2]),
   ];
+  final nextStock = List<Card>.from(stock);
+  var nextOpenSlotsCount = state.openSlotsCount;
 
   var nextSpawnNonce = spawnNonce;
   for (var slotIndex = state.openSlotsCount + 1;
       slotIndex <= openSlotsCount;
       slotIndex++) {
-    if (nextSlots[slotIndex - 1].isEmpty) {
-      nextSlots[slotIndex - 1].add(
-        _spawnOpenSlotAnchor(
-          config,
-          lastSuccessfulTableauRank,
-          roundSeed: roundSeed,
-          spawnNonce: nextSpawnNonce,
-          slotIndex: slotIndex,
-        ),
-      );
-      nextSpawnNonce++;
+    if (config.spawnPolicy == BonusSlotSpawnPolicy.stockTopCard &&
+        slotIndex > 1 &&
+        nextStock.isEmpty) {
+      break;
     }
+    if (nextSlots[slotIndex - 1].isEmpty) {
+      if (config.spawnPolicy == BonusSlotSpawnPolicy.stockTopCard &&
+          slotIndex > 1) {
+        nextSlots[slotIndex - 1].add(nextStock.removeAt(0));
+      } else {
+        nextSlots[slotIndex - 1].add(
+          _spawnOpenSlotAnchor(
+            config,
+            lastSuccessfulTableauRank,
+            roundSeed: roundSeed,
+            spawnNonce: nextSpawnNonce,
+            slotIndex: slotIndex,
+          ),
+        );
+        nextSpawnNonce++;
+      }
+    }
+    nextOpenSlotsCount = slotIndex;
   }
 
   return (
     bonusSlotsState: state.copyWith(
-      openSlotsCount: openSlotsCount,
+      openSlotsCount: nextOpenSlotsCount,
       slots: List<List<Card>>.unmodifiable(
         nextSlots.map((slot) => List<Card>.unmodifiable(slot)).toList(),
       ),
     ),
     nextSpawnNonce: nextSpawnNonce,
+    stock: List<Card>.unmodifiable(nextStock),
   );
 }
 
@@ -773,6 +795,10 @@ Card _spawnOpenSlotAnchor(
           spawnNonce: spawnNonce,
           slotIndex: slotIndex,
         ),
+      );
+    case BonusSlotSpawnPolicy.stockTopCard:
+      throw StateError(
+        'stockTopCard spawn policy must consume stock in the reducer.',
       );
   }
 }

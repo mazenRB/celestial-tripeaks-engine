@@ -81,7 +81,7 @@ Empty input repeats the last command.
 
 ### Bonus Slots
 
-- `--bonus-spawn-policy=joker|tier-fixed-rank|tier-random-rank`
+- `--bonus-spawn-policy=joker|tier-fixed-rank|tier-random-rank|stock-top-card`
 - `--bonus-default-tier=low|high`
 - `--bonus-joker-any=true|false`
 - `--bonus-joker-consume=true|false`

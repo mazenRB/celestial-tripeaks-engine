@@ -215,3 +215,5 @@ Bonus-slot helper:
   deterministically (seed + spawn nonce + 1-based slot index), replay-safe.
   Legacy session decode derives missing round seed from session seed + round
   index using the same round-seed formula as round creation.
+- `BonusSlotSpawnPolicy.stockTopCard` opens newly unlocked slots `2` and `3`
+  by moving `stock.first` into the slot without applying draw-side effects.

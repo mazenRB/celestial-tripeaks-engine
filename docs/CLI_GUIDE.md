@@ -56,7 +56,7 @@ If `verify` prints `OK`, replay reconstruction matches current session state.
 - `--rounds=3|6|10`
 - `--wrap-ace-king=true|false`
 - `--invalid-penalty=<int>`
-- `--bonus-spawn-policy=joker|tier-fixed-rank|tier-random-rank`
+- `--bonus-spawn-policy=joker|tier-fixed-rank|tier-random-rank|stock-top-card`
 - `--bonus-default-tier=low|high`
 - `--bonus-slot2-streak=<int>`
 - `--bonus-slot3-streak=<int>`

@@ -1443,6 +1443,65 @@ void main() {
       expect(state.bonusSlotsState.slots[1].single.rank, expectedRank);
     });
 
+    test('stockTopCard opens slots 2 and 3 by consuming stock in order', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        scoreConfig: const ScoreConfig(
+          pointsTableauToWaste: 5,
+          pointsDrawFromStock: 1000,
+        ),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.stockTopCard,
+          spawnOnOpenSlot2AtStreak: 3,
+          spawnOnOpenSlot3AtStreak: 6,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+
+      final expectedSlot2Card = state.stock.first;
+      final stockBeforeSlot2 = state.stockCount;
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+      expect(state.bonusSlotsState.openSlotsCount, 2);
+      expect(state.bonusSlotsState.slots[1].single, expectedSlot2Card);
+      expect(state.bonusSlotsState.slots[1].single.isJoker, isFalse);
+      expect(state.bonusSlotsState.slots[1].single.isAnchor, isFalse);
+      expect(state.stockCount, stockBeforeSlot2 - 1);
+      expect(state.scoreState.lastBreakdown.drawPoints, 0);
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(21), tick: 4);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(22), tick: 5);
+      final expectedSlot3Card = state.stock.first;
+      final stockBeforeSlot3 = state.stockCount;
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(23), tick: 6);
+      expect(state.bonusSlotsState.openSlotsCount, 3);
+      expect(state.bonusSlotsState.slots[2].single, expectedSlot3Card);
+      expect(state.stockCount, stockBeforeSlot3 - 1);
+    });
+
+    test('stockTopCard leaves slot closed when stock is empty', () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        roundRulesConfig: const RoundRulesConfig(
+          startStockSize: 0,
+          stockDecreaseEveryRounds: 1,
+          minStockSize: 0,
+        ),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.stockTopCard,
+          spawnOnOpenSlot2AtStreak: 3,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+
+      expect(state.stockCount, 0);
+      expect(state.bonusSlotsState.openSlotsCount, 1);
+      expect(state.bonusSlotsState.slots[1], isEmpty);
+      expect(state.actionableBonusSlotIndices, equals(<int>[1]));
+    });
+
     test(
       'placing any tableau card onto joker slot is accepted and consumes joker',
       () {
@@ -1716,6 +1775,44 @@ void main() {
       state = reduceTriPeaks(state, const UndoAction());
       expect(state.removed[21], isFalse);
       expect(state.bonusSlotsState.slots[1].length, beforeTake);
+    });
+
+    test('stockTopCard draw close merges spawned slot card and undo restores',
+        () {
+      var state = TriPeaksState.newGame(
+        deck: _buildStreakUnlockDeck(),
+        undoConfig: const UndoConfig(maxSteps: 10),
+        bonusSlotsConfig: const BonusSlotsConfig(
+          spawnPolicy: BonusSlotSpawnPolicy.stockTopCard,
+          closeOnDraw: true,
+        ),
+      );
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18), tick: 1);
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(19), tick: 2);
+      final beforeSpawn = state;
+      final spawnedCard = state.stock.first;
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(20), tick: 3);
+      expect(state.bonusSlotsState.slots[1].single, spawnedCard);
+
+      state = reduceTriPeaks(state, const DrawFromStockAction(), tick: 4);
+      expect(state.bonusSlotsState.openSlotsCount, 1);
+      expect(state.bonusSlotsState.slots[1], isEmpty);
+      expect(state.bonusSlotsState.slots[0].contains(spawnedCard), isTrue);
+
+      state = reduceTriPeaks(state, const UndoAction(), tick: 5);
+      expect(state.bonusSlotsState.slots[1].single, spawnedCard);
+      expect(state.stockCount, beforeSpawn.stockCount - 1);
+
+      state = reduceTriPeaks(state, const UndoAction(), tick: 6);
+      expect(state.stock, equals(beforeSpawn.stock));
+      expect(
+        state.bonusSlotsState.slots,
+        equals(beforeSpawn.bonusSlotsState.slots),
+      );
+      expect(
+        state.bonusSlotsState.openSlotsCount,
+        beforeSpawn.bonusSlotsState.openSlotsCount,
+      );
     });
   });
 
@@ -2904,6 +3001,53 @@ void main() {
       },
     );
 
+    test(
+      'stockTopCard bonus behavior is preserved in replay reconstruction',
+      () {
+        var liveState = TriPeaksSessionState.newSession(
+          ruleset: TriPeaksRuleset.threeRounds,
+          seed: 11,
+          streakConfig: const StreakConfig(resetOnDraw: false),
+          bonusSlotsConfig: const BonusSlotsConfig(
+            spawnPolicy: BonusSlotSpawnPolicy.stockTopCard,
+          ),
+        );
+        var replay = TriPeaksReplay.newSession(
+          seed: liveState.seed ?? TriPeaksSessionState.defaultSeed,
+          ruleset: liveState.ruleset,
+          scoreConfig: liveState.scoreConfig,
+          roundRulesConfig: liveState.roundRulesConfig,
+          undoConfig: liveState.undoConfig,
+          streakConfig: liveState.streakConfig,
+          strikeTimerConfig: liveState.strikeTimerConfig,
+          bonusSlotsConfig: liveState.bonusSlotsConfig,
+        );
+
+        var guard = 0;
+        while (liveState.currentRound.bonusSlotsState.openSlotsCount < 2 &&
+            guard < 64) {
+          final moves =
+              liveState.currentRound.availableMoves.removableTableauIndices;
+          final action = moves.isNotEmpty
+              ? PlayRoundAction(RemoveTableauCardAction(moves.first))
+              : const PlayRoundAction(DrawFromStockAction());
+          final recorded = recordAction(replay, liveState, action);
+          replay = recorded.replay;
+          liveState = recorded.state;
+          guard++;
+        }
+        expect(liveState.currentRound.bonusSlotsState.openSlotsCount, 2);
+
+        final rebuilt = replayToState(replay);
+        expect(
+          rebuilt.currentRound.bonusSlotsState.slots[1].single,
+          liveState.currentRound.bonusSlotsState.slots[1].single,
+        );
+        expect(rebuilt.currentRound.stock, liveState.currentRound.stock);
+        expect(sessionFingerprint(rebuilt), sessionFingerprint(liveState));
+      },
+    );
+
     test('unsupported replay schema returns typed failure', () {
       final decode = ReplaySession.tryFromMap(
         <String, dynamic>{
@@ -3032,13 +3176,13 @@ void main() {
       expect(decoded.error?.code, DecodeFailureCode.invalidPayload);
     });
 
-    test('bonus slots config round-trip supports tierRandomRank', () {
+    test('bonus slots config round-trip supports stockTopCard', () {
       const config = BonusSlotsConfig(
-        spawnPolicy: BonusSlotSpawnPolicy.tierRandomRank,
+        spawnPolicy: BonusSlotSpawnPolicy.stockTopCard,
       );
       final decoded = BonusSlotsConfig.tryFromMap(config.toMap());
       expect(decoded.isSuccess, isTrue);
-      expect(decoded.value!.spawnPolicy, BonusSlotSpawnPolicy.tierRandomRank);
+      expect(decoded.value!.spawnPolicy, BonusSlotSpawnPolicy.stockTopCard);
     });
 
     test('bonus slots config map is stable (golden)', () {

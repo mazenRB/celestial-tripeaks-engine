@@ -189,6 +189,15 @@ Defaults:
 - Legacy session decode derives missing round seed from session seed + round
   index using the same deterministic round-seed formula.
 
+`stockTopCard` policy:
+
+- Applies only when newly opening slots `2` and `3`.
+- Moves `stock.first` into the newly opened slot and removes it from stock.
+- The spawned card is treated as a normal card, not a joker or anchor.
+- Stock consumption has no draw side effects.
+- If stock is empty, the slot does not open.
+- `openSlotsCount` reflects actually opened slots, not just streak thresholds.
+
 Risk notes:
 
 - Lower slot unlock thresholds increase volatility and combo potential.

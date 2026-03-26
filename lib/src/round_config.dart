@@ -1042,6 +1042,9 @@ enum BonusSlotSpawnPolicy {
   joker,
   tierFixedRank,
   tierRandomRank,
+
+  /// Opens newly unlocked slot 2/3 by consuming the next stock card.
+  stockTopCard,
 }
 
 /// Tier used when spawning deterministic anchor cards.
@@ -1247,7 +1250,10 @@ final class BonusSlotsState {
   /// Slot indices are 1-based in APIs and 0-based in this list.
   final List<List<Card>> slots;
 
-  /// Number of open slots, in range 1..3.
+  /// Number of slots actually open now, in range 1..3.
+  ///
+  /// This may be lower than streak-threshold entitlement when a spawn policy
+  /// requires additional resources, such as stock availability.
   final int openSlotsCount;
 
   /// Last used slot index (1-based), when explicit slot-use action occurs.
