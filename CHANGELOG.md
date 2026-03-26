@@ -2,6 +2,46 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-beta.2] - 2026-03-26
+
+### Added
+
+- Round/session cumulative score helpers:
+  - `cumulativeFinishedRoundsScoreTotal`
+  - `cumulativeIncludingCurrentRoundScoreTotal`
+- `RoundResult.finalScore` persisted on round completion (nullable for backward decode compatibility).
+- Deterministic bonus-slot helper `actionableBonusSlotIndices`.
+- Deterministic random anchor-rank policy support:
+  - `BonusSlotSpawnPolicy.tierRandomRank`
+  - replay-safe anchor rank selection and nonce tracking.
+- Bonus-slot stock-consume spawn policy:
+  - `BonusSlotSpawnPolicy.stockTopCard`
+  - slot-open consumes `stock.first` deterministically.
+- Time-bonus multiplier mode with host-driven deterministic expiry action.
+- Round-based base-point growth configuration (compounding, floor each step).
+- Stock-size progression configuration with layout-aware validation.
+- Engine-owned mode packaging:
+  - `TriPeaksModePreset`
+  - `TriPeaksModeBundle`
+  - preset-backed daily constructors/helpers.
+- Standard single-round ruleset preset support (`TriPeaksRuleset.oneRound`).
+
+### Changed
+
+- `classic` preset now represents standard single-round solitaire profile while preserving celestial score magnitudes.
+- `celestial` preset is centralized in engine catalog and now uses `BonusSlotSpawnPolicy.stockTopCard`.
+- Public score surfaces now expose component-level breakdown and applied multiplier on both state/result.
+
+### Compatibility
+
+- Additive API changes only; decode paths remain backward-compatible for legacy payloads.
+- Preset bundle decode preserves serialized nested config values without re-resolving against current catalog.
+
+### Quality
+
+- Expanded deterministic and replay-parity coverage across scoring, presets, bonus slots, authority runtime, serialization, and save/load.
+- Refactored oversized engine/test modules into focused files with unchanged behavior validated by full analyze/test gates.
+
 ## [1.0.0-beta.1] - 2026-02-20
 
 ### Added
@@ -57,4 +97,3 @@ All notable changes to this project are documented in this file.
 - Expanded automated tests for determinism, replay, serialization, save/load, and bonus-slot behavior.
 - Added CI workflow for format/analyze/test gates.
 - Added release readiness checklist documentation.
-

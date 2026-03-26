@@ -1,6 +1,6 @@
 name: celestial_tripeaks
 description: Classic Solitaire TriPeaks game engine in pure Dart.
-version: 0.1.0
+version: 1.0.0-beta.2
 publish_to: none
 
 environment:
