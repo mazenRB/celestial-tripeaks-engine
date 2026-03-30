@@ -26,10 +26,10 @@ final class ScoreState {
   /// Count of scoring applications processed in this round.
   final int movesCount;
 
-  /// Last applied score delta.
+  /// Total score delta applied by the most recent accepted action.
   final int lastDelta;
 
-  /// Multiplier used on the most recent accepted action.
+  /// Multiplier used on the most recent accepted action's score computation.
   final int currentMultiplier;
 
   /// Component breakdown for the most recent accepted action.

@@ -1,6 +1,6 @@
 # Engine API Guide
 
-Last updated: 2026-02-21
+Last updated: 2026-03-27
 
 This guide focuses on practical integration using the public export surface in
 `lib/tripeaks_engine.dart`.
@@ -18,8 +18,8 @@ This guide focuses on practical integration using the public export surface in
 
 - `TriPeaksSessionState`
 - `TriPeaksSessionAction`
-- `reduceSession(...)`
-- `tryReduceSession(...)`
+- `reduceTriPeaksSession(...)`
+- `tryReduceTriPeaksSession(...)`
 
 ### Preset Packaging
 
@@ -40,9 +40,24 @@ This guide focuses on practical integration using the public export surface in
 ### Match/Multiplayer
 
 - `MatchConfig`, `MatchState`, `MatchEvent`
-- `reduceMatch(...)`
+- `tryReduceMatch(...)`
 - `replayMatchEvents(...)`
 - `MatchScoreState` and match-scoring events
+
+## Terminology
+
+- `round`: one playable TriPeaks board.
+- `session`: a sequence of rounds for one player under one ruleset.
+- `match`: multiplayer orchestration around one or more player sessions.
+- `waste`: the primary playable pile used by normal draw and tableau-removal
+  flow.
+- `bonus slots`: optional additional playable piles. Internally, slot `1`
+  mirrors the waste pile so slot-based mechanics can use one consistent model.
+- `ruleset`: high-level round-count shape such as `oneRound` or `tenRounds`.
+- `...Config`: detailed tuning objects for scoring, round rules, timers,
+  streaks, undo, deal policy, and bonus-slot behavior.
+- `TriPeaksModeBundle`: an engine-owned preset bundle that resolves to a full
+  set of configs without replacing explicit config APIs.
 
 ### Authority Runtime
 
@@ -63,6 +78,10 @@ final next = reduceTriPeaks(state, const DrawFromStockAction());
 ```
 
 Use `tryReduceTriPeaks` when you need typed error handling without throws.
+
+Normal round flow should be described in terms of the `waste` pile. Bonus-slot
+terminology matters when you explicitly target or inspect additional playable
+piles.
 
 Time bonus timer:
 
@@ -93,7 +112,7 @@ var session = TriPeaksSessionState.newSession(
   seed: 42,
 );
 
-final result = tryReduceSession(
+final result = tryReduceTriPeaksSession(
   session,
   const PlayRoundAction(DrawFromStockAction()),
 );
@@ -110,6 +129,9 @@ Session score helpers:
 
 `RoundResult.finalScore` may be `null` for legacy decoded payloads; unknown
 scores are skipped deterministically in cumulative totals.
+
+`TriPeaksSessionStatus` is a compact derived helper for common UI states. It
+does not replace round/session facts already present on the state.
 
 ### Preset-backed Session Setup
 
@@ -190,6 +212,15 @@ Use non-throwing APIs in host/integration boundaries:
 
 They carry typed failure payloads suitable for telemetry and protocol mapping.
 
+For scoring surfaces:
+
+- `ScoreState.currentMultiplier` is the multiplier used on the most recent
+  accepted action.
+- `ScoreState.lastBreakdown` is the component-level score explanation stored on
+  state.
+- `TriPeaksReduceResult.scoreBreakdown` mirrors the resulting state's
+  `lastBreakdown` for the accepted action result.
+
 ## Serialization Entrypoints
 
 Primary map/json contracts:
@@ -211,6 +242,8 @@ Bonus-slot helper:
 
 - `TriPeaksState.actionableBonusSlotIndices` returns sorted indices currently
   accepted by `UseBonusSlotAction(index)`.
+- `BonusSlotsState.openSlotsCount` means slots actually open now, not merely
+  slots implied by streak thresholds in the abstract.
 - `BonusSlotSpawnPolicy.tierRandomRank` selects low/high anchor ranks
   deterministically (seed + spawn nonce + 1-based slot index), replay-safe.
   Legacy session decode derives missing round seed from session seed + round

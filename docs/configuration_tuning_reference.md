@@ -1,6 +1,6 @@
 # Configuration Tuning Reference
 
-Last updated: 2026-02-21
+Last updated: 2026-03-27
 
 All tunable values below are modeled as config objects and injected into
 state/reducer flows.
@@ -39,14 +39,23 @@ Defaults:
 - `timeBonusSecondsPerMove = 2`
 - `timeBonusMaxSeconds = 10`
 
-Multiplier formula for successful tableau removals:
+Naming notes:
 
-- `steps = (currentStreak <= 0) ? 0 : (currentStreak ~/ streakStepSize)`
+- `pointsTableauToWaste` is the base score for a successful tableau removal
+  onto the active playable pile. In normal play this is the waste pile; when
+  bonus slots are in use it can also be one of the currently open bonus piles.
+- `pointsDrawFromStock` is the score delta for a stock draw action. It is not a
+  bonus-slot spawn score and is not multiplied.
+
+Streak multiplier formula for successful tableau removals:
+
+- `steps = (preMoveStreak <= 0) ? 0 : (preMoveStreak ~/ streakStepSize)`
 - `multiplier = min(1 + steps * multiplierStepIncrement, multiplierMax)`
 - `appliedMultiplier = max(1, multiplier)`
 
-In PR1, multiplier applies only to tableau base points. Draw points and peak
-bonus points are not multiplied.
+The streak multiplier applies only to tableau base points. Draw points, peak
+bonus points, invalid penalties, and end-of-round remaining-stock bonus points
+are not multiplied.
 
 Round-based base points progression:
 
@@ -101,6 +110,14 @@ final breakdown = state.scoreState.lastBreakdown;
 print('delta=${breakdown.totalDelta}');
 print('multiplier=${state.scoreState.currentMultiplier}');
 ```
+
+Meaning of the exposed score surfaces:
+
+- `lastBreakdown` is the stored explanation for the most recent accepted
+  action's score computation.
+- `currentMultiplier` is the multiplier used on that same accepted action.
+- `scoreBreakdown` on `TriPeaksReduceResult` mirrors the resulting state's
+  `lastBreakdown`.
 
 ### `RoundRulesConfig`
 
@@ -197,6 +214,8 @@ Defaults:
 - Stock consumption has no draw side effects.
 - If stock is empty, the slot does not open.
 - `openSlotsCount` reflects actually opened slots, not just streak thresholds.
+- `actionableBonusSlotIndices` is the preferred consumer-facing helper for
+  "what can be used right now".
 
 Risk notes:
 

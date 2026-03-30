@@ -1,6 +1,6 @@
 part of '../tripeaks_engine.dart';
 
-/// Configurable bonus-slot behavior linked to streak progression.
+/// Configurable bonus-slot spawn behavior linked to streak progression.
 enum BonusSlotSpawnPolicy {
   joker,
   tierFixedRank,
@@ -17,6 +17,9 @@ enum BonusSlotAnchorTier {
 }
 
 /// Configurable bonus-slot behavior linked to streak progression.
+///
+/// The waste pile is the primary playable pile. Bonus slots are additional
+/// playable piles layered on top of that core flow.
 final class BonusSlotsConfig {
   /// Creates bonus-slots config.
   const BonusSlotsConfig({
@@ -48,10 +51,10 @@ final class BonusSlotsConfig {
         ),
         assert(maxSlots == 3);
 
-  /// Whether bonus slots logic is enabled.
+  /// Whether bonus-slot mechanics beyond the primary waste pile are enabled.
   final bool enabled;
 
-  /// Slot-open spawn behavior.
+  /// Spawn behavior used when newly opened bonus slots need an initial top card.
   final BonusSlotSpawnPolicy spawnPolicy;
 
   /// Default tier used when no successful tableau move exists yet.
@@ -83,7 +86,7 @@ final class BonusSlotsConfig {
 
   /// Max supported slot count.
   ///
-  /// Slot1 is always available.
+  /// Slot `1` mirrors the waste pile and is always available.
   final int maxSlots;
 
   /// Serializes config to JSON-friendly map.
@@ -208,9 +211,10 @@ final class BonusSlotsState {
     lastUsedSlot: null,
   );
 
-  /// A 3-slot set of waste stacks from bottom to top.
+  /// A 3-slot set of playable piles from bottom to top.
   ///
-  /// Slot indices are 1-based in APIs and 0-based in this list.
+  /// Slot `1` is the primary waste pile. Slot indices are 1-based in public
+  /// APIs and 0-based in this list.
   final List<List<Card>> slots;
 
   /// Number of slots actually open now, in range 1..3.
@@ -219,7 +223,7 @@ final class BonusSlotsState {
   /// requires additional resources, such as stock availability.
   final int openSlotsCount;
 
-  /// Last used slot index (1-based), when explicit slot-use action occurs.
+  /// Last explicitly used slot index (1-based).
   final int? lastUsedSlot;
 
   /// Returns a copy with optional changes.

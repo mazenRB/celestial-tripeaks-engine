@@ -148,7 +148,10 @@ final class TriPeaksState {
   /// Whether each tableau position has been removed.
   final List<bool> removed;
 
-  /// Primary waste pile from bottom to top (bonus slot 1).
+  /// Primary waste pile from bottom to top.
+  ///
+  /// Internally, bonus slot `1` mirrors this pile so slot-based mechanics can
+  /// use one consistent representation.
   final List<Card> waste;
 
   /// Stock pile from next-to-draw at index `0`.

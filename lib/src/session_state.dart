@@ -1,6 +1,9 @@
 part of '../tripeaks_engine.dart';
 
 /// Compact derived status helper for common session UX.
+///
+/// This is a convenience view over existing session and round facts, not a
+/// separate source of truth.
 enum TriPeaksSessionStatus {
   inProgress,
   won,
@@ -163,7 +166,7 @@ final class TriPeaksSessionState {
         currentRound.scoreState.totalScore;
   }
 
-  /// Derived deterministic status for UI/integration helpers.
+  /// Derived deterministic status for common UI and integration helpers.
   TriPeaksSessionStatus get status {
     if (isSessionFinished) {
       return TriPeaksSessionStatus.gameOver;

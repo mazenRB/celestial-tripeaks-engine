@@ -7,7 +7,10 @@ extension TriPeaksStateQueries on TriPeaksState {
   /// Number of cards currently in the waste pile.
   int get wasteCount => waste.length;
 
-  /// Top card of bonus slot 1 (legacy waste-top access).
+  /// Top card of the primary waste pile.
+  ///
+  /// Internally, waste is mirrored by bonus slot `1` so slot-based mechanics
+  /// can use one consistent model.
   Card get wasteTop => bonusSlotsState.slots.first.last;
 
   /// Returns a view of cards in tableau index order.
@@ -21,7 +24,7 @@ extension TriPeaksStateQueries on TriPeaksState {
     );
   }
 
-  /// Returns `true` if all 28 tableau cards have been removed.
+  /// Returns `true` if all tableau cards for the active layout are removed.
   bool get isWon => removed.every((isRemoved) => isRemoved);
 
   /// Returns `true` if there are no legal moves and no stock draw available.
@@ -65,10 +68,11 @@ extension TriPeaksStateQueries on TriPeaksState {
         .every((blocker) => removed[blocker]);
   }
 
-  /// Returns `true` if [index] can be moved onto a target bonus slot.
+  /// Returns `true` if [index] can be moved onto a target playable pile.
   ///
-  /// If [targetSlot] is omitted, this checks open slots in priority `1 -> 2 -> 3`
-  /// and returns `true` when at least one slot can accept the move.
+  /// If [targetSlot] is omitted, this checks open piles in priority
+  /// `1 -> 2 -> 3` and returns `true` when at least one currently open pile can
+  /// accept the move.
   bool canRemoveTableau(int index, {int? targetSlot}) {
     if (index < 0 || index >= TriPeaksState._tableauSize) {
       return false;
@@ -102,7 +106,7 @@ extension TriPeaksStateQueries on TriPeaksState {
     return slotIndex >= 1 && slotIndex <= bonusSlotsConfig.maxSlots;
   }
 
-  /// Returns whether [slotIndex] is currently open.
+  /// Returns whether [slotIndex] is currently open now.
   bool isBonusSlotOpen(int slotIndex) {
     if (!isBonusSlotIndexInRange(slotIndex)) {
       return false;
@@ -116,6 +120,9 @@ extension TriPeaksStateQueries on TriPeaksState {
   }
 
   /// Bonus-slot indices accepted by [UseBonusSlotAction] right now.
+  ///
+  /// Prefer this for consumer-facing "what can be used now" queries instead of
+  /// inferring from [BonusSlotsState.openSlotsCount].
   List<int> get actionableBonusSlotIndices {
     final out = <int>[];
     for (var slotIndex = 1;
@@ -150,6 +157,6 @@ extension TriPeaksStateQueries on TriPeaksState {
     );
   }
 
-  /// Whether the next stock card can be drawn to waste.
+  /// Whether the next stock card can be drawn onto the waste pile.
   bool get canDrawFromStock => stock.isNotEmpty;
 }

@@ -18,10 +18,13 @@ final class ScoreConfig {
     this.timeBonusMaxSeconds = 10,
   });
 
-  /// Points added when a tableau card is moved to waste.
+  /// Base points for a successful tableau removal onto the active playable pile.
+  ///
+  /// In normal play this means the waste pile. When bonus slots are open, the
+  /// move may target one of those piles instead.
   final int pointsTableauToWaste;
 
-  /// Points added when drawing one card from stock.
+  /// Points added for a stock draw action.
   final int pointsDrawFromStock;
 
   /// Delta applied for invalid actions.
@@ -36,6 +39,8 @@ final class ScoreConfig {
   final int pointsPerRemainingStockCardOnWin;
 
   /// Selects which multiplier system is active for scoring.
+  ///
+  /// This affects only tableau-base scoring, not draw scoring or other bonuses.
   final ScoreMultiplierMode multiplierMode;
 
   /// Compounding growth applied to tableau base points per round (bps).

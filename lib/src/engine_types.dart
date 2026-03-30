@@ -203,10 +203,14 @@ final class TriPeaksReduceResult {
   /// Score delta applied while processing the action.
   final int scoreDelta;
 
-  /// Component-level explanation for the applied score delta.
+  /// Component-level explanation for the accepted action's score computation.
+  ///
+  /// This mirrors the resulting state's [ScoreState.lastBreakdown].
   final ScoreDeltaBreakdown scoreBreakdown;
 
   /// Multiplier used on the accepted action's scoring computation.
+  ///
+  /// This mirrors the resulting state's [ScoreState.currentMultiplier].
   final int appliedMultiplier;
 
   /// Error details when reduction fails.
