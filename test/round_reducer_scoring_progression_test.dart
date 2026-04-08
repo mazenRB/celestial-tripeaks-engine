@@ -65,6 +65,91 @@ void main() {
       expect(invalid.scoreBreakdown.invalidPenaltyPoints, -3);
     });
 
+    test('negative total score can be disabled with clamped penalty', () {
+      final state = TriPeaksState.newGame(
+        seed: 21,
+        scoreConfig: const ScoreConfig(
+          penaltyInvalidAction: -3,
+          allowNegativeTotalScore: false,
+        ),
+      );
+
+      final invalid = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(99),
+      );
+
+      expect(invalid.isSuccess, isFalse);
+      expect(invalid.scoreDelta, 0);
+      expect(invalid.state.scoreState.totalScore, 0);
+      expect(invalid.state.scoreState.lastDelta, 0);
+      expect(invalid.state.scoreState.movesCount, 1);
+      expect(invalid.scoreBreakdown.invalidPenaltyPoints, 0);
+      expect(invalid.scoreBreakdown.totalDelta, 0);
+    });
+
+    test('negative score clamp applies only when delta crosses below zero', () {
+      var state = TriPeaksState.newGame(
+        deck: buildDeck(
+          tableauOverrides: <int, Card>{
+            18: const Card(Rank.six, Suit.clubs),
+          },
+          waste: const Card(Rank.seven, Suit.hearts),
+        ),
+        scoreConfig: const ScoreConfig(
+          pointsTableauToWaste: 5,
+          penaltyInvalidAction: -3,
+          allowNegativeTotalScore: false,
+        ),
+      );
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      final invalid = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(99),
+      );
+
+      expect(invalid.isSuccess, isFalse);
+      expect(invalid.scoreDelta, -3);
+      expect(invalid.state.scoreState.totalScore, 2);
+      expect(invalid.state.scoreState.lastDelta, -3);
+      expect(invalid.scoreBreakdown.invalidPenaltyPoints, -3);
+      expect(invalid.scoreBreakdown.totalDelta, -3);
+    });
+
+    test('negative score clamp partially applies penalty at floor', () {
+      var state = TriPeaksState.newGame(
+        deck: buildDeck(
+          tableauOverrides: <int, Card>{
+            18: const Card(Rank.six, Suit.clubs),
+          },
+          waste: const Card(Rank.seven, Suit.hearts),
+        ),
+        scoreConfig: const ScoreConfig(
+          pointsTableauToWaste: 2,
+          penaltyInvalidAction: -3,
+          allowNegativeTotalScore: false,
+        ),
+      );
+
+      state = reduceTriPeaks(state, const RemoveTableauCardAction(18));
+      final invalid = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(99),
+      );
+
+      expect(invalid.isSuccess, isFalse);
+      expect(invalid.scoreDelta, -2);
+      expect(invalid.state.scoreState.totalScore, 0);
+      expect(invalid.state.scoreState.lastDelta, -2);
+      expect(invalid.scoreBreakdown.invalidPenaltyPoints, -2);
+      expect(invalid.scoreBreakdown.totalDelta, -2);
+      expect(
+        invalid.scoreBreakdown,
+        equals(invalid.state.scoreState.lastBreakdown),
+      );
+    });
+
     test('multiplier defaults preserve legacy behavior', () {
       final state = TriPeaksState.newGame(deck: buildStreakUnlockDeck());
       final first = tryReduceTriPeaks(

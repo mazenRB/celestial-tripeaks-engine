@@ -38,25 +38,38 @@ final class ScoreState {
   /// Returns the next score state after applying [delta].
   ScoreState applyDelta(
     int delta, {
+    bool allowNegativeTotalScore = true,
     int appliedMultiplier = 1,
     ScoreDeltaBreakdown? breakdown,
   }) {
     final normalizedMultiplier = appliedMultiplier < 1 ? 1 : appliedMultiplier;
-    final nextBreakdown = breakdown ??
-        ScoreDeltaBreakdown(
-          tableauBasePoints: delta > 0 ? delta : 0,
-          multiplierExtraPoints: 0,
-          peakBonusPoints: 0,
-          drawPoints: 0,
-          invalidPenaltyPoints: delta < 0 ? delta : 0,
-          endRoundRemainingStockBonusPoints: 0,
-          appliedMultiplier: normalizedMultiplier,
-          totalDelta: delta,
-        );
+    final nextTotalScore = allowNegativeTotalScore
+        ? totalScore + delta
+        : max(totalScore + delta, 0);
+    final effectiveDelta = nextTotalScore - totalScore;
+    final nextBreakdown = breakdown == null
+        ? ScoreDeltaBreakdown(
+            tableauBasePoints: effectiveDelta > 0 ? effectiveDelta : 0,
+            multiplierExtraPoints: 0,
+            peakBonusPoints: 0,
+            drawPoints: 0,
+            invalidPenaltyPoints: effectiveDelta < 0 ? effectiveDelta : 0,
+            endRoundRemainingStockBonusPoints: 0,
+            appliedMultiplier: normalizedMultiplier,
+            totalDelta: effectiveDelta,
+          )
+        : breakdown.totalDelta == effectiveDelta
+            ? breakdown
+            : breakdown.copyWith(
+                invalidPenaltyPoints:
+                    breakdown.invalidPenaltyPoints + (effectiveDelta - delta),
+                appliedMultiplier: normalizedMultiplier,
+                totalDelta: effectiveDelta,
+              );
     return ScoreState(
-      totalScore: totalScore + delta,
+      totalScore: nextTotalScore,
       movesCount: movesCount + 1,
-      lastDelta: delta,
+      lastDelta: effectiveDelta,
       currentMultiplier: normalizedMultiplier,
       lastBreakdown: nextBreakdown,
     );

@@ -50,6 +50,31 @@ final class ScoreDeltaBreakdown {
   /// Final score delta for the action.
   final int totalDelta;
 
+  /// Returns a copy with optional changes.
+  ScoreDeltaBreakdown copyWith({
+    int? tableauBasePoints,
+    int? multiplierExtraPoints,
+    int? peakBonusPoints,
+    int? drawPoints,
+    int? invalidPenaltyPoints,
+    int? endRoundRemainingStockBonusPoints,
+    int? appliedMultiplier,
+    int? totalDelta,
+  }) {
+    return ScoreDeltaBreakdown(
+      tableauBasePoints: tableauBasePoints ?? this.tableauBasePoints,
+      multiplierExtraPoints:
+          multiplierExtraPoints ?? this.multiplierExtraPoints,
+      peakBonusPoints: peakBonusPoints ?? this.peakBonusPoints,
+      drawPoints: drawPoints ?? this.drawPoints,
+      invalidPenaltyPoints: invalidPenaltyPoints ?? this.invalidPenaltyPoints,
+      endRoundRemainingStockBonusPoints: endRoundRemainingStockBonusPoints ??
+          this.endRoundRemainingStockBonusPoints,
+      appliedMultiplier: appliedMultiplier ?? this.appliedMultiplier,
+      totalDelta: totalDelta ?? this.totalDelta,
+    );
+  }
+
   /// Serializes score breakdown to JSON-friendly map.
   Map<String, dynamic> toMap() {
     return <String, dynamic>{

@@ -19,7 +19,7 @@ void main() {
 
     test('fingerprint is stable for fixed canonical state', () {
       final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), '54f511b5');
+      expect(stateFingerprint(state), '8614e617');
     });
   });
 }

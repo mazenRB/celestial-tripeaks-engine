@@ -84,19 +84,21 @@ TriPeaksReduceResult tryReduceTriPeaks(
       preprocessed.bonusSlotsConfig,
       nextStreakState,
     );
+    final nextScoreState = preprocessed.scoreState.applyDelta(
+      penalty,
+      allowNegativeTotalScore: preprocessed.scoreConfig.allowNegativeTotalScore,
+      appliedMultiplier: 1,
+      breakdown: breakdown,
+    );
     return TriPeaksReduceResult(
       state: preprocessed._copyWith(
-        scoreState: preprocessed.scoreState.applyDelta(
-          penalty,
-          appliedMultiplier: 1,
-          breakdown: breakdown,
-        ),
+        scoreState: nextScoreState,
         streakState: nextStreakState,
         strikeTimerState: nextStrikeTimerState,
         bonusSlotsState: nextBonusSlotsState,
       ),
-      scoreDelta: penalty,
-      scoreBreakdown: breakdown,
+      scoreDelta: nextScoreState.lastDelta,
+      scoreBreakdown: nextScoreState.lastBreakdown,
       appliedMultiplier: 1,
       error: error,
     );
@@ -125,6 +127,8 @@ TriPeaksReduceResult tryReduceTriPeaks(
       );
       final nextScoreState = applied.state.scoreState.applyDelta(
         bonus,
+        allowNegativeTotalScore:
+            applied.state.scoreConfig.allowNegativeTotalScore,
         appliedMultiplier: applied.appliedMultiplier,
         breakdown: breakdown,
       );

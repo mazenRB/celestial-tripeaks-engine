@@ -95,5 +95,27 @@ void main() {
       expect(result.state.currentRound.scoreState.lastDelta, -3);
       expect(result.state.currentRound.scoreState.movesCount, 1);
     });
+
+    test('session respects non-negative score clamp when disabled', () {
+      final session = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        seed: 13,
+        scoreConfig: const ScoreConfig(
+          penaltyInvalidAction: -3,
+          allowNegativeTotalScore: false,
+        ),
+      );
+
+      final result = tryReduceTriPeaksSession(
+        session,
+        const PlayRoundAction(RemoveTableauCardAction(99)),
+      );
+
+      expect(result.isSuccess, isFalse);
+      expect(result.roundError?.code, TriPeaksErrorCode.invalidTableauIndex);
+      expect(result.state.currentRound.scoreState.totalScore, 0);
+      expect(result.state.currentRound.scoreState.lastDelta, 0);
+      expect(result.state.currentRound.scoreState.movesCount, 1);
+    });
   });
 }

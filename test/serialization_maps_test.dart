@@ -60,6 +60,33 @@ void main() {
       expect(decoded.error?.code, DecodeFailureCode.invalidPayload);
     });
 
+    test('score config round-trip preserves allowNegativeTotalScore', () {
+      const config = ScoreConfig(
+        penaltyInvalidAction: -3,
+        allowNegativeTotalScore: false,
+      );
+
+      final decoded = ScoreConfig.tryFromMap(config.toMap());
+
+      expect(decoded.isSuccess, isTrue);
+      expect(decoded.value!.penaltyInvalidAction, -3);
+      expect(decoded.value!.allowNegativeTotalScore, isFalse);
+    });
+
+    test('score config decode defaults missing allowNegativeTotalScore to true',
+        () {
+      final map = const ScoreConfig(
+        penaltyInvalidAction: -3,
+      ).toMap()
+        ..remove('allowNegativeTotalScore');
+
+      final decoded = ScoreConfig.tryFromMap(map);
+
+      expect(decoded.isSuccess, isTrue);
+      expect(decoded.value!.penaltyInvalidAction, -3);
+      expect(decoded.value!.allowNegativeTotalScore, isTrue);
+    });
+
     test('round result finalScore is backward compatible', () {
       final legacy = RoundResult.tryFromMap(
         <String, dynamic>{
@@ -187,6 +214,7 @@ void main() {
       expect(restored.waste, equals(progressed.waste));
       expect(restored.stock, equals(progressed.stock));
       expect(restored.scoreConfig.penaltyInvalidAction, -3);
+      expect(restored.scoreConfig.allowNegativeTotalScore, isTrue);
       expect(restored.scoreState.totalScore, progressed.scoreState.totalScore);
       expect(
         restored.streakState.currentStreak,

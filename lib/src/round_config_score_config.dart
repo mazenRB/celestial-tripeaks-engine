@@ -7,6 +7,7 @@ final class ScoreConfig {
     this.pointsTableauToWaste = 5,
     this.pointsDrawFromStock = 0,
     this.penaltyInvalidAction = 0,
+    this.allowNegativeTotalScore = true,
     this.pointsPeakCleared = 0,
     this.pointsPerRemainingStockCardOnWin = 0,
     this.multiplierMode = ScoreMultiplierMode.streak,
@@ -31,6 +32,9 @@ final class ScoreConfig {
   ///
   /// This can be negative to represent penalties.
   final int penaltyInvalidAction;
+
+  /// Whether total score may go below zero.
+  final bool allowNegativeTotalScore;
 
   /// Points awarded once when a peak is fully cleared.
   final int pointsPeakCleared;
@@ -71,6 +75,7 @@ final class ScoreConfig {
       'pointsTableauToWaste': pointsTableauToWaste,
       'pointsDrawFromStock': pointsDrawFromStock,
       'penaltyInvalidAction': penaltyInvalidAction,
+      'allowNegativeTotalScore': allowNegativeTotalScore,
       'pointsPeakCleared': pointsPeakCleared,
       'pointsPerRemainingStockCardOnWin': pointsPerRemainingStockCardOnWin,
       'multiplierMode': multiplierMode.name,
@@ -104,6 +109,7 @@ final class ScoreConfig {
     final a = map['pointsTableauToWaste'];
     final b = map['pointsDrawFromStock'];
     final c = map['penaltyInvalidAction'];
+    final allowNegativeTotalScore = map['allowNegativeTotalScore'];
     final d = map['pointsPeakCleared'];
     final remainingStockBonus = map['pointsPerRemainingStockCardOnWin'];
     final multiplierMode = map['multiplierMode'];
@@ -116,6 +122,7 @@ final class ScoreConfig {
     if (a is! int ||
         b is! int ||
         c is! int ||
+        (allowNegativeTotalScore != null && allowNegativeTotalScore is! bool) ||
         d is! int ||
         (remainingStockBonus != null && remainingStockBonus is! int) ||
         (multiplierMode != null && multiplierMode is! String) ||
@@ -151,6 +158,7 @@ final class ScoreConfig {
         pointsTableauToWaste: a,
         pointsDrawFromStock: b,
         penaltyInvalidAction: c,
+        allowNegativeTotalScore: allowNegativeTotalScore as bool? ?? true,
         pointsPeakCleared: d,
         pointsPerRemainingStockCardOnWin: remainingStockBonus as int? ?? 0,
         multiplierMode: resolvedMode,

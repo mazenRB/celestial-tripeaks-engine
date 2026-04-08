@@ -41,6 +41,7 @@ part of '../tripeaks_engine.dart';
       stock: state.stock.skip(1).toList(growable: false),
       scoreState: state.scoreState.applyDelta(
         delta,
+        allowNegativeTotalScore: state.scoreConfig.allowNegativeTotalScore,
         appliedMultiplier: 1,
         breakdown: breakdown,
       ),
@@ -141,6 +142,7 @@ part of '../tripeaks_engine.dart';
       stock: spawnResult.stock,
       scoreState: state.scoreState.applyDelta(
         delta,
+        allowNegativeTotalScore: state.scoreConfig.allowNegativeTotalScore,
         appliedMultiplier: appliedMultiplier,
         breakdown: breakdown,
       ),

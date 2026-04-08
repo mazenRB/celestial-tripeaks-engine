@@ -5,7 +5,7 @@ void main() {
   group('Parity baseline guardrails', () {
     test('deterministic fingerprint fixture remains stable', () {
       final state = TriPeaksState.newGame(seed: 42);
-      expect(stateFingerprint(state), '54f511b5');
+      expect(stateFingerprint(state), '8614e617');
     });
 
     test('scoring breakdown invariants remain exact', () {
