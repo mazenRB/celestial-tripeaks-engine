@@ -49,6 +49,7 @@ final class TriPeaksModeBundle {
     scoreConfig: const ScoreConfig(
       pointsTableauToWaste: 4096,
       penaltyInvalidAction: -20000,
+      allowNegativeTotalScore: false,
       pointsPeakCleared: 200000,
       pointsPerRemainingStockCardOnWin: 50000,
       multiplierMode: ScoreMultiplierMode.timeBonus,

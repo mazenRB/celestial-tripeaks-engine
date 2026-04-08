@@ -36,6 +36,7 @@ void main() {
       expect(bundle.ruleset, TriPeaksRuleset.oneRound);
       expect(bundle.scoreConfig.pointsTableauToWaste, 4096);
       expect(bundle.scoreConfig.penaltyInvalidAction, -20000);
+      expect(bundle.scoreConfig.allowNegativeTotalScore, isTrue);
       expect(bundle.scoreConfig.pointsPeakCleared, 200000);
       expect(bundle.scoreConfig.pointsPerRemainingStockCardOnWin, 50000);
       expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.streak);
@@ -76,6 +77,7 @@ void main() {
       expect(bundle.ruleset, TriPeaksRuleset.tenRounds);
       expect(bundle.scoreConfig.pointsTableauToWaste, 4096);
       expect(bundle.scoreConfig.penaltyInvalidAction, -20000);
+      expect(bundle.scoreConfig.allowNegativeTotalScore, isFalse);
       expect(bundle.scoreConfig.pointsPeakCleared, 200000);
       expect(bundle.scoreConfig.pointsPerRemainingStockCardOnWin, 50000);
       expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.timeBonus);
@@ -96,6 +98,28 @@ void main() {
       expect(bundle.dealPolicyConfig.maxAttempts, 200);
       expect(bundle.dealPolicyConfig.solverNodeLimit, 300000);
       expect(bundle, isNot(TriPeaksModeBundle.classic));
+    });
+
+    test('celestial preset clamps invalid penalties at zero total score', () {
+      final bundle = TriPeaksModeBundle.forPreset(
+        TriPeaksModePreset.celestial,
+      );
+      final state = TriPeaksState.newGame(
+        seed: 21,
+        scoreConfig: bundle.scoreConfig,
+      );
+
+      final invalid = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(99),
+      );
+
+      expect(invalid.isSuccess, isFalse);
+      expect(invalid.scoreDelta, 0);
+      expect(invalid.state.scoreState.totalScore, 0);
+      expect(invalid.state.scoreState.lastDelta, 0);
+      expect(invalid.scoreBreakdown.totalDelta, 0);
+      expect(invalid.scoreBreakdown.invalidPenaltyPoints, 0);
     });
 
     test('bundle fields can be reused across session replay and match setup',
