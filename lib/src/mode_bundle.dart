@@ -25,7 +25,7 @@ final class TriPeaksModeBundle {
     ruleset: TriPeaksRuleset.oneRound,
     scoreConfig: ScoreConfig(
       pointsTableauToWaste: 4096,
-      penaltyInvalidAction: 20000,
+      penaltyInvalidAction: -20000,
       pointsPeakCleared: 200000,
       pointsPerRemainingStockCardOnWin: 50000,
     ),
@@ -48,7 +48,7 @@ final class TriPeaksModeBundle {
     ruleset: TriPeaksRuleset.tenRounds,
     scoreConfig: const ScoreConfig(
       pointsTableauToWaste: 4096,
-      penaltyInvalidAction: 20000,
+      penaltyInvalidAction: -20000,
       pointsPeakCleared: 200000,
       pointsPerRemainingStockCardOnWin: 50000,
       multiplierMode: ScoreMultiplierMode.timeBonus,

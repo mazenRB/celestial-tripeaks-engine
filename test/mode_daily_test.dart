@@ -35,7 +35,7 @@ void main() {
       expect(bundle.preset, TriPeaksModePreset.classic);
       expect(bundle.ruleset, TriPeaksRuleset.oneRound);
       expect(bundle.scoreConfig.pointsTableauToWaste, 4096);
-      expect(bundle.scoreConfig.penaltyInvalidAction, 20000);
+      expect(bundle.scoreConfig.penaltyInvalidAction, -20000);
       expect(bundle.scoreConfig.pointsPeakCleared, 200000);
       expect(bundle.scoreConfig.pointsPerRemainingStockCardOnWin, 50000);
       expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.streak);
@@ -75,7 +75,7 @@ void main() {
       expect(bundle.preset, TriPeaksModePreset.celestial);
       expect(bundle.ruleset, TriPeaksRuleset.tenRounds);
       expect(bundle.scoreConfig.pointsTableauToWaste, 4096);
-      expect(bundle.scoreConfig.penaltyInvalidAction, 20000);
+      expect(bundle.scoreConfig.penaltyInvalidAction, -20000);
       expect(bundle.scoreConfig.pointsPeakCleared, 200000);
       expect(bundle.scoreConfig.pointsPerRemainingStockCardOnWin, 50000);
       expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.timeBonus);
