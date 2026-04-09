@@ -5,6 +5,69 @@ part of '../tripeaks_engine.dart';
   int scoreDelta,
   ScoreDeltaBreakdown scoreBreakdown,
   int appliedMultiplier,
+}) _applyStartRoundTimerAction(TriPeaksState state) {
+  final nextHistory = _pushUndoSnapshot(state);
+  final nextRoundTimer = state.roundTimerState.copyWith(
+    isStarted: true,
+    deadlineToken: state.roundTimerState.deadlineToken + 1,
+  );
+  const breakdown = ScoreDeltaBreakdown.zero;
+  return (
+    state: state._copyWith(
+      roundTimerState: nextRoundTimer,
+      scoreState: state.scoreState.withNoScoreChange(
+        appliedMultiplier: 1,
+        breakdown: breakdown,
+      ),
+      undoHistory: nextHistory,
+    ),
+    scoreDelta: 0,
+    scoreBreakdown: breakdown,
+    appliedMultiplier: 1,
+  );
+}
+
+({
+  TriPeaksState state,
+  int scoreDelta,
+  ScoreDeltaBreakdown scoreBreakdown,
+  int appliedMultiplier,
+}) _applyAdvanceRoundTimerAction(
+  TriPeaksState state, {
+  required int elapsedSeconds,
+}) {
+  final nextHistory = _pushUndoSnapshot(state);
+  final nextRemaining = max(
+    0,
+    state.roundTimerState.remainingSeconds - elapsedSeconds,
+  );
+  final nextRoundTimer = state.roundTimerState.copyWith(
+    remainingSeconds: nextRemaining,
+    deadlineToken: state.roundTimerState.deadlineToken + 1,
+  );
+  const breakdown = ScoreDeltaBreakdown.zero;
+  return (
+    state: state._copyWith(
+      roundStatus:
+          nextRemaining == 0 ? RoundStatus.timedOut : state.roundStatus,
+      roundTimerState: nextRoundTimer,
+      scoreState: state.scoreState.withNoScoreChange(
+        appliedMultiplier: 1,
+        breakdown: breakdown,
+      ),
+      undoHistory: nextHistory,
+    ),
+    scoreDelta: 0,
+    scoreBreakdown: breakdown,
+    appliedMultiplier: 1,
+  );
+}
+
+({
+  TriPeaksState state,
+  int scoreDelta,
+  ScoreDeltaBreakdown scoreBreakdown,
+  int appliedMultiplier,
 }) _applyDrawFromStockAction(
   TriPeaksState state, {
   required int? targetSlot,

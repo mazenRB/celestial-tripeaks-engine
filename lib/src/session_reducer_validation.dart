@@ -1,7 +1,65 @@
 part of '../tripeaks_engine.dart';
 
 TriPeaksRuleError? _validateAction(TriPeaksState state, TriPeaksAction action) {
+  if (state.isTimedOut) {
+    return const TriPeaksRuleError(
+      code: TriPeaksErrorCode.roundTimedOut,
+      message: 'Round has already timed out.',
+    );
+  }
+  if (state.isRoundTimerAwaitingStart && action is! StartRoundTimerAction) {
+    return const TriPeaksRuleError(
+      code: TriPeaksErrorCode.roundTimerNotStarted,
+      message: 'Round timer has not started yet.',
+    );
+  }
   switch (action) {
+    case StartRoundTimerAction():
+      if (!state.hasActiveRoundTimer) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.roundTimerDisabled,
+          message: 'Round timer is disabled for this round.',
+        );
+      }
+      if (state.roundTimerState.isStarted) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.roundTimerAlreadyStarted,
+          message: 'Round timer is already started.',
+        );
+      }
+      return null;
+
+    case AdvanceRoundTimerAction(
+        elapsedSeconds: final elapsedSeconds,
+        deadlineToken: final deadlineToken,
+      ):
+      if (!state.hasActiveRoundTimer) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.roundTimerDisabled,
+          message: 'Round timer is disabled for this round.',
+        );
+      }
+      if (!state.roundTimerState.isStarted) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.roundTimerNotStarted,
+          message: 'Round timer has not started yet.',
+        );
+      }
+      if (elapsedSeconds <= 0) {
+        return const TriPeaksRuleError(
+          code: TriPeaksErrorCode.invalidRoundTimerElapsed,
+          message: 'Round timer elapsedSeconds must be positive.',
+        );
+      }
+      if (deadlineToken != state.roundTimerState.deadlineToken) {
+        return TriPeaksRuleError(
+          code: TriPeaksErrorCode.staleRoundTimerUpdate,
+          message: 'Stale round timer token $deadlineToken (expected '
+              '${state.roundTimerState.deadlineToken}).',
+        );
+      }
+      return null;
+
     case DrawFromStockAction(targetSlot: final targetSlot):
       if (!state.canDrawFromStock) {
         return const TriPeaksRuleError(

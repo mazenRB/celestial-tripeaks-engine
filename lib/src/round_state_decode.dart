@@ -96,6 +96,22 @@ DecodeResult<TriPeaksState> _triPeaksStateTryFromMap(Map<String, dynamic> map) {
   if (!roundRulesResult.isSuccess) {
     return DecodeResult.failure(roundRulesResult.error!);
   }
+  final roundTimerConfigMap = map['roundTimerConfig'];
+  DecodeResult<RoundTimerConfig>? roundTimerConfigResult;
+  if (roundTimerConfigMap != null) {
+    if (roundTimerConfigMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'roundTimerConfig must be a map when present.',
+        ),
+      );
+    }
+    roundTimerConfigResult = RoundTimerConfig.tryFromMap(roundTimerConfigMap);
+    if (!roundTimerConfigResult.isSuccess) {
+      return DecodeResult.failure(roundTimerConfigResult.error!);
+    }
+  }
   final undoConfigMap = map['undoConfig'];
   if (undoConfigMap is! Map<String, dynamic>) {
     return const DecodeResult.failure(
@@ -177,6 +193,22 @@ DecodeResult<TriPeaksState> _triPeaksStateTryFromMap(Map<String, dynamic> map) {
   final streakStateResult = StreakState.tryFromMap(streakStateMap);
   if (!streakStateResult.isSuccess) {
     return DecodeResult.failure(streakStateResult.error!);
+  }
+  final roundTimerStateMap = map['roundTimerState'];
+  DecodeResult<RoundTimerState>? roundTimerStateResult;
+  if (roundTimerStateMap != null) {
+    if (roundTimerStateMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'roundTimerState must be a map when present.',
+        ),
+      );
+    }
+    roundTimerStateResult = RoundTimerState.tryFromMap(roundTimerStateMap);
+    if (!roundTimerStateResult.isSuccess) {
+      return DecodeResult.failure(roundTimerStateResult.error!);
+    }
   }
   final strikeTimerStateMap = map['strikeTimerState'];
   if (strikeTimerStateMap is! Map<String, dynamic>) {
@@ -300,6 +332,45 @@ DecodeResult<TriPeaksState> _triPeaksStateTryFromMap(Map<String, dynamic> map) {
     ),
   );
   final normalizedWaste = List<Card>.unmodifiable(normalizedSlots.first);
+  final roundStatusName = map['roundStatus'];
+  if (roundStatusName != null && roundStatusName is! String) {
+    return const DecodeResult.failure(
+      DecodeFailure(
+        code: DecodeFailureCode.invalidPayload,
+        message: 'roundStatus must be a string when present.',
+      ),
+    );
+  }
+  RoundStatus roundStatus = RoundStatus.inProgress;
+  if (roundStatusName case final name?) {
+    try {
+      roundStatus = RoundStatus.values.byName(name);
+    } on Object catch (error) {
+      return DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'Invalid roundStatus: $error',
+        ),
+      );
+    }
+  }
+  final resolvedRoundNumber = roundNumber as int? ?? 1;
+  final resolvedRoundTimerConfig =
+      roundTimerConfigResult?.value ?? const RoundTimerConfig();
+  if (_roundTimerConfigValidationMessageForRound(
+    resolvedRoundTimerConfig,
+    resolvedRoundNumber,
+  )
+      case final timerError?) {
+    return DecodeResult.failure(
+      DecodeFailure(
+        code: DecodeFailureCode.invalidPayload,
+        message: timerError,
+      ),
+    );
+  }
+  final resolvedRoundTimerState = roundTimerStateResult?.value ??
+      _initialRoundTimerState(resolvedRoundTimerConfig, resolvedRoundNumber);
 
   return DecodeResult.success(
     TriPeaksState._(
@@ -307,16 +378,19 @@ DecodeResult<TriPeaksState> _triPeaksStateTryFromMap(Map<String, dynamic> map) {
       removed: removed.cast<bool>(),
       waste: normalizedWaste,
       stock: stockResult.value!,
-      roundNumber: roundNumber as int? ?? 1,
+      roundNumber: resolvedRoundNumber,
       roundSeed: roundSeed as int? ?? TriPeaksState.defaultSeed,
       scoreConfig: scoreConfigResult.value!,
       roundRulesConfig: roundRulesResult.value!,
+      roundTimerConfig: resolvedRoundTimerConfig,
       undoConfig: undoConfigResult.value!,
       streakConfig: streakConfigResult.value!,
       strikeTimerConfig: strikeTimerConfigResult.value!,
       bonusSlotsConfig: bonusSlotsConfigResult.value!,
+      roundStatus: roundStatus,
       scoreState: scoreStateResult.value!,
       streakState: streakStateResult.value!,
+      roundTimerState: resolvedRoundTimerState,
       strikeTimerState: strikeTimerStateResult.value!,
       timeBonusTimerState:
           timeBonusTimerStateResult?.value ?? TimeBonusTimerState.initial,

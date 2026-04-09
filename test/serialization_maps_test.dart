@@ -87,6 +87,69 @@ void main() {
       expect(decoded.value!.allowNegativeTotalScore, isTrue);
     });
 
+    test('round timer config round-trip preserves mixed schedule', () {
+      const config = RoundTimerConfig(
+        enabled: true,
+        durationsSecondsByRound: <int>[9, 0, 7],
+      );
+
+      final decoded = RoundTimerConfig.tryFromMap(config.toMap());
+
+      expect(decoded.isSuccess, isTrue);
+      expect(decoded.value!.enabled, isTrue);
+      expect(
+        decoded.value!.durationsSecondsByRound,
+        equals(const <int>[9, 0, 7]),
+      );
+    });
+
+    test('session decode defaults missing roundTimerConfig to disabled', () {
+      final map = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        seed: 14,
+      ).toMap()
+        ..remove('roundTimerConfig');
+
+      final decoded = TriPeaksSessionState.tryFromMap(map);
+
+      expect(decoded.isSuccess, isTrue);
+      expect(decoded.value!.roundTimerConfig.enabled, isFalse);
+      expect(decoded.value!.currentRound.hasActiveRoundTimer, isFalse);
+    });
+
+    test('replay and match config round-trip preserve roundTimerConfig', () {
+      const roundTimerConfig = RoundTimerConfig(
+        enabled: true,
+        durationsSecondsByRound: <int>[5, 0, 7],
+      );
+      final replay = ReplaySession.newSession(
+        seed: 9,
+        ruleset: TriPeaksRuleset.threeRounds,
+        roundTimerConfig: roundTimerConfig,
+      );
+      final replayDecoded = ReplaySession.tryFromMap(replay.toMap());
+      expect(replayDecoded.isSuccess, isTrue);
+      expect(
+        replayDecoded.value!.roundTimerConfig.durationsSecondsByRound,
+        equals(roundTimerConfig.durationsSecondsByRound),
+      );
+
+      final matchConfig = MatchConfig(
+        matchMode: MatchMode.realtime,
+        matchId: 'match-1',
+        matchSeed: 42,
+        maxPlayers: 2,
+        ruleset: TriPeaksRuleset.threeRounds,
+        roundTimerConfig: roundTimerConfig,
+      );
+      final matchDecoded = MatchConfig.tryFromMap(matchConfig.toMap());
+      expect(matchDecoded.isSuccess, isTrue);
+      expect(
+        matchDecoded.value!.roundTimerConfig.durationsSecondsByRound,
+        equals(roundTimerConfig.durationsSecondsByRound),
+      );
+    });
+
     test('round result finalScore is backward compatible', () {
       final legacy = RoundResult.tryFromMap(
         <String, dynamic>{
@@ -260,6 +323,13 @@ void main() {
 
     test('session action map round-trip preserves action identity', () {
       final actions = <TriPeaksSessionAction>[
+        const PlayRoundAction(StartRoundTimerAction()),
+        const PlayRoundAction(
+          AdvanceRoundTimerAction(
+            elapsedSeconds: 2,
+            deadlineToken: 7,
+          ),
+        ),
         const PlayRoundAction(DrawFromStockAction()),
         const PlayRoundAction(RemoveTableauCardAction(12)),
         const PlayRoundAction(UndoAction()),
@@ -276,6 +346,28 @@ void main() {
 
         expect(map['type'], 'tripeaks_session_action');
         switch ((action, decoded)) {
+          case (
+              PlayRoundAction(action: StartRoundTimerAction()),
+              PlayRoundAction(action: StartRoundTimerAction())
+            ):
+            break;
+          case (
+              PlayRoundAction(
+                action: AdvanceRoundTimerAction(
+                  elapsedSeconds: final elapsedA,
+                  deadlineToken: final tokenA,
+                ),
+              ),
+              PlayRoundAction(
+                action: AdvanceRoundTimerAction(
+                  elapsedSeconds: final elapsedB,
+                  deadlineToken: final tokenB,
+                ),
+              )
+            ):
+            expect(elapsedA, elapsedB);
+            expect(tokenA, tokenB);
+            break;
           case (
               PlayRoundAction(action: DrawFromStockAction()),
               PlayRoundAction(action: DrawFromStockAction())

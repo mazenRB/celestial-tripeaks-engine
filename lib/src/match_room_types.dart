@@ -32,6 +32,7 @@ final class MatchConfig {
     this.ruleset = TriPeaksRuleset.threeRounds,
     this.scoreConfig = const ScoreConfig(),
     this.roundRulesConfig = const RoundRulesConfig(),
+    this.roundTimerConfig = const RoundTimerConfig(),
     this.undoConfig = const UndoConfig(),
     this.streakConfig = const StreakConfig(),
     this.strikeTimerConfig = const StrikeTimerConfig(),
@@ -60,6 +61,9 @@ final class MatchConfig {
 
   /// Shared round mechanics config.
   final RoundRulesConfig roundRulesConfig;
+
+  /// Shared round timer config.
+  final RoundTimerConfig roundTimerConfig;
 
   /// Shared undo config.
   final UndoConfig undoConfig;
@@ -91,6 +95,7 @@ final class MatchConfig {
       'ruleset': ruleset.toMap(),
       'scoreConfig': scoreConfig.toMap(),
       'roundRulesConfig': roundRulesConfig.toMap(),
+      'roundTimerConfig': roundTimerConfig.toMap(),
       'undoConfig': undoConfig.toMap(),
       'streakConfig': streakConfig.toMap(),
       'strikeTimerConfig': strikeTimerConfig.toMap(),
@@ -122,6 +127,7 @@ final class MatchConfig {
     final rulesetMap = map['ruleset'];
     final scoreMap = map['scoreConfig'];
     final roundRulesMap = map['roundRulesConfig'];
+    final roundTimerMap = map['roundTimerConfig'];
     final undoMap = map['undoConfig'];
     final streakMap = map['streakConfig'];
     final strikeTimerMap = map['strikeTimerConfig'];
@@ -130,6 +136,7 @@ final class MatchConfig {
     if (rulesetMap is! Map<String, dynamic> ||
         scoreMap is! Map<String, dynamic> ||
         roundRulesMap is! Map<String, dynamic> ||
+        (roundTimerMap != null && roundTimerMap is! Map<String, dynamic>) ||
         undoMap is! Map<String, dynamic> ||
         streakMap is! Map<String, dynamic> ||
         strikeTimerMap is! Map<String, dynamic> ||
@@ -154,6 +161,15 @@ final class MatchConfig {
     final roundRulesResult = RoundRulesConfig.tryFromMap(roundRulesMap);
     if (!roundRulesResult.isSuccess) {
       return DecodeResult.failure(roundRulesResult.error!);
+    }
+    DecodeResult<RoundTimerConfig>? roundTimerResult;
+    if (roundTimerMap != null) {
+      roundTimerResult = RoundTimerConfig.tryFromMap(
+        roundTimerMap as Map<String, dynamic>,
+      );
+      if (!roundTimerResult.isSuccess) {
+        return DecodeResult.failure(roundTimerResult.error!);
+      }
     }
     final undoResult = UndoConfig.tryFromMap(undoMap);
     if (!undoResult.isSuccess) {
@@ -204,6 +220,7 @@ final class MatchConfig {
           ruleset: rulesetResult.value!,
           scoreConfig: scoreResult.value!,
           roundRulesConfig: roundRulesResult.value!,
+          roundTimerConfig: roundTimerResult?.value ?? const RoundTimerConfig(),
           undoConfig: undoResult.value!,
           streakConfig: streakResult.value!,
           strikeTimerConfig: strikeTimerResult.value!,

@@ -60,7 +60,7 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
       }
 
       final nextRound = roundResult.state;
-      if (!nextRound.isWon && !nextRound.isLost) {
+      if (!nextRound.isFinished) {
         return TriPeaksSessionReduceResult(
           state: state._copyWith(currentRound: nextRound),
         );
@@ -69,9 +69,14 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
       final completed = state.roundsCompleted + 1;
       final won = state.roundsWon + (nextRound.isWon ? 1 : 0);
       final lost = state.roundsLost + (nextRound.isLost ? 1 : 0);
+      final timedOut = state.roundsTimedOut + (nextRound.isTimedOut ? 1 : 0);
       final result = RoundResult(
         roundNumber: state.currentRoundNumber,
-        outcome: nextRound.isWon ? RoundOutcome.won : RoundOutcome.lost,
+        outcome: nextRound.isWon
+            ? RoundOutcome.won
+            : nextRound.isLost
+                ? RoundOutcome.lost
+                : RoundOutcome.timedOut,
         finalScore: nextRound.scoreState.totalScore,
       );
       return TriPeaksSessionReduceResult(
@@ -80,6 +85,7 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
           roundsCompleted: completed,
           roundsWon: won,
           roundsLost: lost,
+          roundsTimedOut: timedOut,
           roundResults: <RoundResult>[...state.roundResults, result],
         ),
       );
@@ -110,6 +116,7 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
         roundDecks: state.roundDecks,
         scoreConfig: state.scoreConfig,
         roundRulesConfig: state.roundRulesConfig,
+        roundTimerConfig: state.roundTimerConfig,
         undoConfig: state.undoConfig,
         streakConfig: state.streakConfig,
         strikeTimerConfig: state.strikeTimerConfig,
@@ -160,6 +167,7 @@ TriPeaksSessionReduceResult tryReduceTriPeaksSession(
         roundDecks: state.roundDecks,
         scoreConfig: state.scoreConfig,
         roundRulesConfig: state.roundRulesConfig,
+        roundTimerConfig: state.roundTimerConfig,
         undoConfig: state.undoConfig,
         streakConfig: state.streakConfig,
         strikeTimerConfig: state.strikeTimerConfig,

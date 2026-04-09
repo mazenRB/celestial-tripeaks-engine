@@ -53,6 +53,33 @@ final class UseBonusSlotAction extends TriPeaksAction {
   Map<String, dynamic> toMap() => roundActionToMap(this);
 }
 
+/// Action that explicitly starts a timed round.
+final class StartRoundTimerAction extends TriPeaksAction {
+  /// Creates a round-timer start action.
+  const StartRoundTimerAction();
+
+  /// Serializes action to JSON-friendly map.
+  Map<String, dynamic> toMap() => roundActionToMap(this);
+}
+
+/// Action that advances a started round timer by [elapsedSeconds].
+final class AdvanceRoundTimerAction extends TriPeaksAction {
+  /// Creates a round-timer advancement action.
+  const AdvanceRoundTimerAction({
+    required this.elapsedSeconds,
+    required this.deadlineToken,
+  });
+
+  /// Whole seconds elapsed since the previous timer update.
+  final int elapsedSeconds;
+
+  /// The deadline token expected by the sender.
+  final int deadlineToken;
+
+  /// Serializes action to JSON-friendly map.
+  Map<String, dynamic> toMap() => roundActionToMap(this);
+}
+
 /// Action that requests strike-expiry processing for [deadlineToken].
 final class StrikeTimerExpiredAction extends TriPeaksAction {
   /// Creates a strike-expiry action.

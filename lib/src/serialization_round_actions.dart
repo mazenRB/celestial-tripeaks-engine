@@ -3,6 +3,23 @@ part of '../tripeaks_engine.dart';
 /// Serializes one round action with schema/type envelope.
 Map<String, dynamic> roundActionToMap(TriPeaksAction action) {
   switch (action) {
+    case StartRoundTimerAction():
+      return <String, dynamic>{
+        'schemaVersion': _serializationSchemaV1,
+        'type': 'tripeaks_round_action',
+        'actionType': 'start_round_timer',
+      };
+    case AdvanceRoundTimerAction(
+        elapsedSeconds: final elapsedSeconds,
+        deadlineToken: final deadlineToken,
+      ):
+      return <String, dynamic>{
+        'schemaVersion': _serializationSchemaV1,
+        'type': 'tripeaks_round_action',
+        'actionType': 'advance_round_timer',
+        'elapsedSeconds': elapsedSeconds,
+        'deadlineToken': deadlineToken,
+      };
     case DrawFromStockAction(targetSlot: final targetSlot):
       return <String, dynamic>{
         'schemaVersion': _serializationSchemaV1,
@@ -61,6 +78,26 @@ DecodeResult<TriPeaksAction> tryDecodeRoundAction(Map<String, dynamic> json) {
   }
 
   switch (actionType) {
+    case 'start_round_timer':
+      return const DecodeResult.success(StartRoundTimerAction());
+    case 'advance_round_timer':
+      final elapsedSeconds = json['elapsedSeconds'];
+      final deadlineToken = json['deadlineToken'];
+      if (elapsedSeconds is! int || deadlineToken is! int) {
+        return const DecodeResult.failure(
+          DecodeFailure(
+            code: DecodeFailureCode.invalidPayload,
+            message:
+                'advance_round_timer requires int elapsedSeconds and deadlineToken.',
+          ),
+        );
+      }
+      return DecodeResult.success(
+        AdvanceRoundTimerAction(
+          elapsedSeconds: elapsedSeconds,
+          deadlineToken: deadlineToken,
+        ),
+      );
     case 'draw_from_stock':
       final targetSlot = json['targetSlot'];
       if (targetSlot != null && targetSlot is! int) {

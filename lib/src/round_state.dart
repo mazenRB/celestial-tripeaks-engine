@@ -18,6 +18,7 @@ final class TriPeaksState {
     int roundNumber = 1,
     ScoreConfig scoreConfig = const ScoreConfig(),
     RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
+    RoundTimerConfig roundTimerConfig = const RoundTimerConfig(),
     UndoConfig undoConfig = const UndoConfig(),
     StreakConfig streakConfig = const StreakConfig(),
     StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
@@ -64,12 +65,15 @@ final class TriPeaksState {
       roundSeed: effectiveSeed,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
+      roundTimerConfig: roundTimerConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
       strikeTimerConfig: strikeTimerConfig,
       bonusSlotsConfig: bonusSlotsConfig,
+      roundStatus: RoundStatus.inProgress,
       scoreState: ScoreState.initial,
       streakState: StreakState.initial,
+      roundTimerState: _initialRoundTimerState(roundTimerConfig, roundNumber),
       strikeTimerState: StrikeTimerState.initial,
       timeBonusTimerState: TimeBonusTimerState.initial,
       bonusSlotsState: initialBonusSlots,
@@ -89,12 +93,15 @@ final class TriPeaksState {
     required this.roundSeed,
     required this.scoreConfig,
     required this.roundRulesConfig,
+    required this.roundTimerConfig,
     required this.undoConfig,
     required this.streakConfig,
     required this.strikeTimerConfig,
     required this.bonusSlotsConfig,
+    required this.roundStatus,
     required this.scoreState,
     required this.streakState,
+    required this.roundTimerState,
     required this.strikeTimerState,
     required this.timeBonusTimerState,
     required this.bonusSlotsState,
@@ -169,6 +176,9 @@ final class TriPeaksState {
   /// Mechanics rules used for this round.
   final RoundRulesConfig roundRulesConfig;
 
+  /// Round timer config used for this round.
+  final RoundTimerConfig roundTimerConfig;
+
   /// Undo behavior config.
   final UndoConfig undoConfig;
 
@@ -181,11 +191,17 @@ final class TriPeaksState {
   /// Bonus-slots behavior config.
   final BonusSlotsConfig bonusSlotsConfig;
 
+  /// Current round lifecycle state.
+  final RoundStatus roundStatus;
+
   /// Current scoring snapshot.
   final ScoreState scoreState;
 
   /// Current streak tracking snapshot.
   final StreakState streakState;
+
+  /// Current round timer snapshot.
+  final RoundTimerState roundTimerState;
 
   /// Current strike timer snapshot.
   final StrikeTimerState strikeTimerState;
@@ -228,9 +244,11 @@ final class TriPeaksState {
     List<Card>? stock,
     int? roundNumber,
     int? roundSeed,
+    RoundStatus? roundStatus,
     ScoreState? scoreState,
     StreakState? streakState,
     BonusSlotsState? bonusSlotsState,
+    RoundTimerState? roundTimerState,
     StrikeTimerState? strikeTimerState,
     TimeBonusTimerState? timeBonusTimerState,
     Rank? lastSuccessfulTableauRank,
@@ -251,12 +269,15 @@ final class TriPeaksState {
       roundSeed: roundSeed ?? this.roundSeed,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
+      roundTimerConfig: roundTimerConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
       strikeTimerConfig: strikeTimerConfig,
       bonusSlotsConfig: bonusSlotsConfig,
+      roundStatus: roundStatus ?? this.roundStatus,
       scoreState: scoreState ?? this.scoreState,
       streakState: streakState ?? this.streakState,
+      roundTimerState: roundTimerState ?? this.roundTimerState,
       strikeTimerState: strikeTimerState ?? this.strikeTimerState,
       timeBonusTimerState: timeBonusTimerState ?? this.timeBonusTimerState,
       bonusSlotsState: bonusSlotsState ?? this.bonusSlotsState,
@@ -278,8 +299,10 @@ final class TriPeaksState {
       waste: waste,
       stock: stock,
       roundNumber: roundNumber,
+      roundStatus: roundStatus,
       scoreState: scoreState,
       streakState: streakState,
+      roundTimerState: roundTimerState,
       strikeTimerState: strikeTimerState,
       timeBonusTimerState: timeBonusTimerState,
       bonusSlotsState: bonusSlotsState,
@@ -296,8 +319,10 @@ final class TriPeaksState {
       waste: snapshot.waste,
       stock: snapshot.stock,
       roundNumber: snapshot.roundNumber,
+      roundStatus: snapshot.roundStatus,
       scoreState: snapshot.scoreState,
       streakState: snapshot.streakState,
+      roundTimerState: snapshot.roundTimerState,
       strikeTimerState: snapshot.strikeTimerState,
       timeBonusTimerState: snapshot.timeBonusTimerState,
       bonusSlotsState: snapshot.bonusSlotsState,
@@ -361,12 +386,15 @@ final class TriPeaksState {
       'roundSeed': roundSeed,
       'scoreConfig': scoreConfig.toMap(),
       'roundRulesConfig': roundRulesConfig.toMap(),
+      'roundTimerConfig': roundTimerConfig.toMap(),
       'undoConfig': undoConfig.toMap(),
       'streakConfig': streakConfig.toMap(),
       'strikeTimerConfig': strikeTimerConfig.toMap(),
       'bonusSlotsConfig': bonusSlotsConfig.toMap(),
+      'roundStatus': roundStatus.name,
       'scoreState': scoreState.toMap(),
       'streakState': streakState.toMap(),
+      'roundTimerState': roundTimerState.toMap(),
       'strikeTimerState': strikeTimerState.toMap(),
       'timeBonusTimerState': timeBonusTimerState.toMap(),
       'bonusSlotsState': bonusSlotsState.toMap(),

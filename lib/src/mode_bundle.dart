@@ -12,6 +12,7 @@ final class TriPeaksModeBundle {
     required this.ruleset,
     required this.scoreConfig,
     required this.roundRulesConfig,
+    required this.roundTimerConfig,
     required this.undoConfig,
     required this.streakConfig,
     required this.strikeTimerConfig,
@@ -35,6 +36,7 @@ final class TriPeaksModeBundle {
       stockDecreaseEveryRounds: 999999,
       minStockSize: 23,
     ),
+    roundTimerConfig: RoundTimerConfig(),
     undoConfig: UndoConfig(enabled: false, maxSteps: 0),
     streakConfig: StreakConfig(),
     strikeTimerConfig: StrikeTimerConfig(enabled: false),
@@ -61,6 +63,21 @@ final class TriPeaksModeBundle {
       startStockSize: 21,
       stockDecreaseEveryRounds: 2,
       minStockSize: 16,
+    ),
+    roundTimerConfig: const RoundTimerConfig(
+      enabled: true,
+      durationsSecondsByRound: <int>[
+        88,
+        81,
+        76,
+        70,
+        65,
+        61,
+        56,
+        52,
+        49,
+        45,
+      ],
     ),
     undoConfig: const UndoConfig(enabled: false, maxSteps: 0),
     streakConfig: const StreakConfig(),
@@ -100,6 +117,9 @@ final class TriPeaksModeBundle {
   /// Round rules config.
   final RoundRulesConfig roundRulesConfig;
 
+  /// Round timer config.
+  final RoundTimerConfig roundTimerConfig;
+
   /// Undo config.
   final UndoConfig undoConfig;
 
@@ -124,6 +144,7 @@ final class TriPeaksModeBundle {
       'ruleset': ruleset.toMap(),
       'scoreConfig': scoreConfig.toMap(),
       'roundRulesConfig': roundRulesConfig.toMap(),
+      'roundTimerConfig': roundTimerConfig.toMap(),
       'undoConfig': undoConfig.toMap(),
       'streakConfig': streakConfig.toMap(),
       'strikeTimerConfig': strikeTimerConfig.toMap(),
@@ -156,6 +177,7 @@ final class TriPeaksModeBundle {
     final rulesetMap = map['ruleset'];
     final scoreConfigMap = map['scoreConfig'];
     final roundRulesConfigMap = map['roundRulesConfig'];
+    final roundTimerConfigMap = map['roundTimerConfig'];
     final undoConfigMap = map['undoConfig'];
     final streakConfigMap = map['streakConfig'];
     final strikeTimerConfigMap = map['strikeTimerConfig'];
@@ -165,6 +187,8 @@ final class TriPeaksModeBundle {
         rulesetMap is! Map<String, dynamic> ||
         scoreConfigMap is! Map<String, dynamic> ||
         roundRulesConfigMap is! Map<String, dynamic> ||
+        (roundTimerConfigMap != null &&
+            roundTimerConfigMap is! Map<String, dynamic>) ||
         undoConfigMap is! Map<String, dynamic> ||
         streakConfigMap is! Map<String, dynamic> ||
         strikeTimerConfigMap is! Map<String, dynamic> ||
@@ -199,6 +223,15 @@ final class TriPeaksModeBundle {
     if (!roundRulesConfigResult.isSuccess) {
       return DecodeResult.failure(roundRulesConfigResult.error!);
     }
+    DecodeResult<RoundTimerConfig>? roundTimerConfigResult;
+    if (roundTimerConfigMap != null) {
+      roundTimerConfigResult = RoundTimerConfig.tryFromMap(
+        roundTimerConfigMap as Map<String, dynamic>,
+      );
+      if (!roundTimerConfigResult.isSuccess) {
+        return DecodeResult.failure(roundTimerConfigResult.error!);
+      }
+    }
     final undoConfigResult = UndoConfig.tryFromMap(undoConfigMap);
     if (!undoConfigResult.isSuccess) {
       return DecodeResult.failure(undoConfigResult.error!);
@@ -228,6 +261,8 @@ final class TriPeaksModeBundle {
         ruleset: rulesetResult.value!,
         scoreConfig: scoreConfigResult.value!,
         roundRulesConfig: roundRulesConfigResult.value!,
+        roundTimerConfig:
+            roundTimerConfigResult?.value ?? const RoundTimerConfig(),
         undoConfig: undoConfigResult.value!,
         streakConfig: streakConfigResult.value!,
         strikeTimerConfig: strikeTimerConfigResult.value!,
@@ -250,6 +285,8 @@ final class TriPeaksModeBundle {
             _canonicalBundleMap(scoreConfig.toMap()) &&
         _canonicalBundleMap(other.roundRulesConfig.toMap()) ==
             _canonicalBundleMap(roundRulesConfig.toMap()) &&
+        _canonicalBundleMap(other.roundTimerConfig.toMap()) ==
+            _canonicalBundleMap(roundTimerConfig.toMap()) &&
         _canonicalBundleMap(other.undoConfig.toMap()) ==
             _canonicalBundleMap(undoConfig.toMap()) &&
         _canonicalBundleMap(other.streakConfig.toMap()) ==
@@ -268,6 +305,7 @@ final class TriPeaksModeBundle {
         _canonicalBundleMap(ruleset.toMap()),
         _canonicalBundleMap(scoreConfig.toMap()),
         _canonicalBundleMap(roundRulesConfig.toMap()),
+        _canonicalBundleMap(roundTimerConfig.toMap()),
         _canonicalBundleMap(undoConfig.toMap()),
         _canonicalBundleMap(streakConfig.toMap()),
         _canonicalBundleMap(strikeTimerConfig.toMap()),

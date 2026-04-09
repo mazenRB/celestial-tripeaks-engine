@@ -82,6 +82,11 @@ void main() {
       expect(bundle.scoreConfig.pointsPerRemainingStockCardOnWin, 50000);
       expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.timeBonus);
       expect(bundle.roundRulesConfig.minStockSize, 16);
+      expect(bundle.roundTimerConfig.enabled, isTrue);
+      expect(
+        bundle.roundTimerConfig.durationsSecondsByRound,
+        equals(<int>[88, 81, 76, 70, 65, 61, 56, 52, 49, 45]),
+      );
       expect(bundle.undoConfig.enabled, isFalse);
       expect(bundle.strikeTimerConfig.enabled, isFalse);
       expect(
@@ -132,6 +137,7 @@ void main() {
         seed: 42,
         scoreConfig: bundle.scoreConfig,
         roundRulesConfig: bundle.roundRulesConfig,
+        roundTimerConfig: bundle.roundTimerConfig,
         undoConfig: bundle.undoConfig,
         streakConfig: bundle.streakConfig,
         strikeTimerConfig: bundle.strikeTimerConfig,
@@ -142,6 +148,7 @@ void main() {
         ruleset: bundle.ruleset,
         scoreConfig: bundle.scoreConfig,
         roundRulesConfig: bundle.roundRulesConfig,
+        roundTimerConfig: bundle.roundTimerConfig,
         undoConfig: bundle.undoConfig,
         streakConfig: bundle.streakConfig,
         strikeTimerConfig: bundle.strikeTimerConfig,
@@ -155,6 +162,7 @@ void main() {
         ruleset: bundle.ruleset,
         scoreConfig: bundle.scoreConfig,
         roundRulesConfig: bundle.roundRulesConfig,
+        roundTimerConfig: bundle.roundTimerConfig,
         undoConfig: bundle.undoConfig,
         streakConfig: bundle.streakConfig,
         strikeTimerConfig: bundle.strikeTimerConfig,
@@ -164,10 +172,22 @@ void main() {
 
       expect(session.ruleset, bundle.ruleset);
       expect(session.scoreConfig.toMap(), bundle.scoreConfig.toMap());
+      expect(
+        session.roundTimerConfig.toMap(),
+        bundle.roundTimerConfig.toMap(),
+      );
       expect(replay.ruleset, bundle.ruleset);
       expect(replay.scoreConfig.toMap(), bundle.scoreConfig.toMap());
+      expect(
+        replay.roundTimerConfig.toMap(),
+        bundle.roundTimerConfig.toMap(),
+      );
       expect(match.ruleset, bundle.ruleset);
       expect(match.scoreConfig.toMap(), bundle.scoreConfig.toMap());
+      expect(
+        match.roundTimerConfig.toMap(),
+        bundle.roundTimerConfig.toMap(),
+      );
       expect(
         match.dealPolicyConfig.toMap(),
         bundle.dealPolicyConfig.toMap(),

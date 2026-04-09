@@ -208,6 +208,58 @@ void main() {
           decoded.entries.first.action.kind, replay.entries.first.action.kind);
     });
 
+    test('replay reproduces timed round lifecycle deterministically', () {
+      const roundTimerConfig = RoundTimerConfig(
+        enabled: true,
+        durationsSecondsByRound: <int>[2, 0, 0],
+      );
+      var liveState = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        seed: 77,
+        scoreConfig: const ScoreConfig(pointsDrawFromStock: 5),
+        roundTimerConfig: roundTimerConfig,
+      );
+      var replay = TriPeaksReplay.newSession(
+        seed: 77,
+        ruleset: TriPeaksRuleset.threeRounds,
+        scoreConfig: const ScoreConfig(pointsDrawFromStock: 5),
+        roundTimerConfig: roundTimerConfig,
+      );
+
+      for (final action in <TriPeaksSessionAction>[
+        const PlayRoundAction(StartRoundTimerAction()),
+        const PlayRoundAction(DrawFromStockAction()),
+        const PlayRoundAction(
+          AdvanceRoundTimerAction(
+            elapsedSeconds: 2,
+            deadlineToken: 1,
+          ),
+        ),
+      ]) {
+        final recorded = recordAction(replay, liveState, action);
+        replay = recorded.replay;
+        liveState = recorded.state;
+      }
+
+      final rebuilt = replayToState(replay);
+
+      expect(rebuilt.roundsTimedOut, liveState.roundsTimedOut);
+      expect(
+          rebuilt.currentRound.isTimedOut, liveState.currentRound.isTimedOut);
+      expect(
+        rebuilt.roundResults
+            .map((result) => (result.outcome, result.finalScore))
+            .toList(growable: false),
+        equals(
+          liveState.roundResults
+              .map((result) => (result.outcome, result.finalScore))
+              .toList(growable: false),
+        ),
+      );
+      expect(
+          replay.entries.last.action.kind, ReplayActionKind.advanceRoundTimer);
+    });
+
     test('unsupported replay schema returns typed failure', () {
       final decode = ReplaySession.tryFromMap(
         <String, dynamic>{

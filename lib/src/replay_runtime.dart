@@ -59,6 +59,7 @@ TriPeaksSessionState replayStep(ReplaySession replay, int count) {
     seed: replay.seed,
     scoreConfig: replay.scoreConfig,
     roundRulesConfig: replay.roundRulesConfig,
+    roundTimerConfig: replay.roundTimerConfig,
     undoConfig: replay.undoConfig,
     streakConfig: replay.streakConfig,
     strikeTimerConfig: replay.strikeTimerConfig,
@@ -93,6 +94,12 @@ bool _isAcceptedResult(TriPeaksSessionReduceResult result) {
       case TriPeaksErrorCode.tableauCardNotRemovable:
       case TriPeaksErrorCode.emptyStock:
         return true;
+      case TriPeaksErrorCode.roundTimedOut:
+      case TriPeaksErrorCode.roundTimerDisabled:
+      case TriPeaksErrorCode.roundTimerNotStarted:
+      case TriPeaksErrorCode.roundTimerAlreadyStarted:
+      case TriPeaksErrorCode.staleRoundTimerUpdate:
+      case TriPeaksErrorCode.invalidRoundTimerElapsed:
       case TriPeaksErrorCode.undoDisabled:
       case TriPeaksErrorCode.nothingToUndo:
       case TriPeaksErrorCode.invalidBonusSlotIndex:
@@ -124,6 +131,18 @@ ReplayFailureReason _mapFailureReason(TriPeaksSessionReduceResult result) {
   }
   if (result.roundError case TriPeaksRuleError(code: final code)) {
     switch (code) {
+      case TriPeaksErrorCode.roundTimedOut:
+        return ReplayFailureReason.roundTimedOut;
+      case TriPeaksErrorCode.roundTimerDisabled:
+        return ReplayFailureReason.roundTimerDisabled;
+      case TriPeaksErrorCode.roundTimerNotStarted:
+        return ReplayFailureReason.roundTimerNotStarted;
+      case TriPeaksErrorCode.roundTimerAlreadyStarted:
+        return ReplayFailureReason.roundTimerAlreadyStarted;
+      case TriPeaksErrorCode.staleRoundTimerUpdate:
+        return ReplayFailureReason.staleRoundTimerUpdate;
+      case TriPeaksErrorCode.invalidRoundTimerElapsed:
+        return ReplayFailureReason.invalidRoundTimerElapsed;
       case TriPeaksErrorCode.undoDisabled:
         return ReplayFailureReason.undoDisabled;
       case TriPeaksErrorCode.nothingToUndo:

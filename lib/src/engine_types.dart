@@ -5,10 +5,16 @@ enum TriPeaksErrorCode {
   invalidTableauIndex,
   tableauCardNotRemovable,
   emptyStock,
+  roundTimedOut,
   undoDisabled,
   nothingToUndo,
   invalidBonusSlotIndex,
   bonusSlotClosed,
+  roundTimerDisabled,
+  roundTimerNotStarted,
+  roundTimerAlreadyStarted,
+  staleRoundTimerUpdate,
+  invalidRoundTimerElapsed,
   strikeTimerDisabled,
   strikeTimerNotArmed,
   staleStrikeTimerExpiry,
@@ -72,10 +78,19 @@ enum AbortReason {
   disconnect,
 }
 
+/// Unified lifecycle state for one round.
+enum RoundStatus {
+  inProgress,
+  won,
+  lost,
+  timedOut,
+}
+
 /// Outcome type for a completed round.
 enum RoundOutcome {
   won,
   lost,
+  timedOut,
   aborted,
 }
 

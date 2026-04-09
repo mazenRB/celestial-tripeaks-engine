@@ -22,10 +22,16 @@ TriPeaksState reduceTriPeaks(
 
       case TriPeaksErrorCode.tableauCardNotRemovable:
       case TriPeaksErrorCode.emptyStock:
+      case TriPeaksErrorCode.roundTimedOut:
       case TriPeaksErrorCode.undoDisabled:
       case TriPeaksErrorCode.nothingToUndo:
       case TriPeaksErrorCode.invalidBonusSlotIndex:
       case TriPeaksErrorCode.bonusSlotClosed:
+      case TriPeaksErrorCode.roundTimerDisabled:
+      case TriPeaksErrorCode.roundTimerNotStarted:
+      case TriPeaksErrorCode.roundTimerAlreadyStarted:
+      case TriPeaksErrorCode.staleRoundTimerUpdate:
+      case TriPeaksErrorCode.invalidRoundTimerElapsed:
       case TriPeaksErrorCode.strikeTimerDisabled:
       case TriPeaksErrorCode.strikeTimerNotArmed:
       case TriPeaksErrorCode.staleStrikeTimerExpiry:
@@ -53,6 +59,12 @@ TriPeaksReduceResult tryReduceTriPeaks(
   if (error != null) {
     if (error.code == TriPeaksErrorCode.undoDisabled ||
         error.code == TriPeaksErrorCode.nothingToUndo ||
+        error.code == TriPeaksErrorCode.roundTimedOut ||
+        error.code == TriPeaksErrorCode.roundTimerDisabled ||
+        error.code == TriPeaksErrorCode.roundTimerNotStarted ||
+        error.code == TriPeaksErrorCode.roundTimerAlreadyStarted ||
+        error.code == TriPeaksErrorCode.staleRoundTimerUpdate ||
+        error.code == TriPeaksErrorCode.invalidRoundTimerElapsed ||
         error.code == TriPeaksErrorCode.strikeTimerDisabled ||
         error.code == TriPeaksErrorCode.strikeTimerNotArmed ||
         error.code == TriPeaksErrorCode.staleStrikeTimerExpiry ||
@@ -160,6 +172,15 @@ TriPeaksReduceResult tryReduceTriPeaks(
   required int effectiveTick,
 }) {
   switch (action) {
+    case StartRoundTimerAction():
+      return _applyStartRoundTimerAction(state);
+
+    case AdvanceRoundTimerAction(elapsedSeconds: final elapsedSeconds):
+      return _applyAdvanceRoundTimerAction(
+        state,
+        elapsedSeconds: elapsedSeconds,
+      );
+
     case DrawFromStockAction(targetSlot: final targetSlot):
       return _applyDrawFromStockAction(state, targetSlot: targetSlot);
 

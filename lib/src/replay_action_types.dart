@@ -2,6 +2,8 @@ part of '../tripeaks_engine.dart';
 
 /// Session action kinds for replay DTO.
 enum ReplayActionKind {
+  startRoundTimer,
+  advanceRoundTimer,
   drawFromStock,
   removeTableauCard,
   undo,
@@ -17,6 +19,7 @@ final class ReplayActionDto {
   /// Creates a replay action descriptor.
   const ReplayActionDto({
     required this.kind,
+    this.elapsedSeconds,
     this.tableauIndex,
     this.targetSlot,
     this.slotIndex,
@@ -29,6 +32,19 @@ final class ReplayActionDto {
     switch (action) {
       case PlayRoundAction(action: final roundAction):
         switch (roundAction) {
+          case StartRoundTimerAction():
+            return const ReplayActionDto(
+              kind: ReplayActionKind.startRoundTimer,
+            );
+          case AdvanceRoundTimerAction(
+              elapsedSeconds: final elapsedSeconds,
+              deadlineToken: final deadlineToken,
+            ):
+            return ReplayActionDto(
+              kind: ReplayActionKind.advanceRoundTimer,
+              elapsedSeconds: elapsedSeconds,
+              deadlineToken: deadlineToken,
+            );
           case DrawFromStockAction(targetSlot: final targetSlot):
             return ReplayActionDto(
               kind: ReplayActionKind.drawFromStock,
@@ -114,6 +130,7 @@ final class ReplayActionDto {
       return DecodeResult.success(
         ReplayActionDto(
           kind: ReplayActionKind.values.byName(kindName),
+          elapsedSeconds: map['elapsedSeconds'] as int?,
           tableauIndex: map['tableauIndex'] as int?,
           targetSlot: map['targetSlot'] as int?,
           slotIndex: map['slotIndex'] as int?,
@@ -134,6 +151,9 @@ final class ReplayActionDto {
 
   /// Action kind.
   final ReplayActionKind kind;
+
+  /// Elapsed seconds for round-timer advancement.
+  final int? elapsedSeconds;
 
   /// Tableau index for remove action.
   final int? tableauIndex;
@@ -156,6 +176,7 @@ final class ReplayActionDto {
       'schemaVersion': _serializationSchemaV1,
       'type': 'replay_action',
       'kind': kind.name,
+      if (elapsedSeconds case final seconds?) 'elapsedSeconds': seconds,
       if (tableauIndex case final index?) 'tableauIndex': index,
       if (targetSlot case final target?) 'targetSlot': target,
       if (slotIndex case final slot?) 'slotIndex': slot,
@@ -167,6 +188,22 @@ final class ReplayActionDto {
   /// Converts back to runtime session action.
   TriPeaksSessionAction toSessionAction() {
     switch (kind) {
+      case ReplayActionKind.startRoundTimer:
+        return const PlayRoundAction(StartRoundTimerAction());
+      case ReplayActionKind.advanceRoundTimer:
+        final seconds = elapsedSeconds;
+        final token = deadlineToken;
+        if (seconds == null || token == null) {
+          throw StateError(
+            'elapsedSeconds and deadlineToken are required for advanceRoundTimer.',
+          );
+        }
+        return PlayRoundAction(
+          AdvanceRoundTimerAction(
+            elapsedSeconds: seconds,
+            deadlineToken: token,
+          ),
+        );
       case ReplayActionKind.drawFromStock:
         return PlayRoundAction(
           DrawFromStockAction(targetSlot: targetSlot),

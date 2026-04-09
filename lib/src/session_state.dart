@@ -8,6 +8,7 @@ enum TriPeaksSessionStatus {
   inProgress,
   won,
   lost,
+  timedOut,
   gameOver,
 }
 
@@ -29,6 +30,7 @@ final class TriPeaksSessionState {
     List<List<Card>>? roundDecks,
     ScoreConfig scoreConfig = const ScoreConfig(),
     RoundRulesConfig roundRulesConfig = const RoundRulesConfig(),
+    RoundTimerConfig roundTimerConfig = const RoundTimerConfig(),
     UndoConfig undoConfig = const UndoConfig(),
     StreakConfig streakConfig = const StreakConfig(),
     StrikeTimerConfig strikeTimerConfig = const StrikeTimerConfig(),
@@ -46,6 +48,17 @@ final class TriPeaksSessionState {
         TriPeaksState.newGame(deck: deck);
       }
     }
+    if (_roundTimerConfigValidationMessage(
+      roundTimerConfig,
+      ruleset.roundsPerGame,
+    )
+        case final timerError?) {
+      throw ArgumentError.value(
+        roundTimerConfig.durationsSecondsByRound,
+        'roundTimerConfig',
+        timerError,
+      );
+    }
 
     final effectiveSeed = seed ?? defaultSeed;
 
@@ -55,6 +68,7 @@ final class TriPeaksSessionState {
       roundDecks: roundDecks,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
+      roundTimerConfig: roundTimerConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
       strikeTimerConfig: strikeTimerConfig,
@@ -67,6 +81,7 @@ final class TriPeaksSessionState {
       roundDecks: roundDecks,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
+      roundTimerConfig: roundTimerConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
       strikeTimerConfig: strikeTimerConfig,
@@ -75,6 +90,7 @@ final class TriPeaksSessionState {
       roundsCompleted: 0,
       roundsWon: 0,
       roundsLost: 0,
+      roundsTimedOut: 0,
       roundsAborted: 0,
       roundResults: const <RoundResult>[],
       currentRound: firstRound,
@@ -87,6 +103,7 @@ final class TriPeaksSessionState {
     required this.roundDecks,
     required this.scoreConfig,
     required this.roundRulesConfig,
+    required this.roundTimerConfig,
     required this.undoConfig,
     required this.streakConfig,
     required this.strikeTimerConfig,
@@ -95,6 +112,7 @@ final class TriPeaksSessionState {
     required this.roundsCompleted,
     required this.roundsWon,
     required this.roundsLost,
+    required this.roundsTimedOut,
     required this.roundsAborted,
     required this.roundResults,
     required this.currentRound,
@@ -107,6 +125,7 @@ final class TriPeaksSessionState {
   final List<List<Card>>? roundDecks;
   final ScoreConfig scoreConfig;
   final RoundRulesConfig roundRulesConfig;
+  final RoundTimerConfig roundTimerConfig;
   final UndoConfig undoConfig;
   final StreakConfig streakConfig;
   final StrikeTimerConfig strikeTimerConfig;
@@ -124,6 +143,9 @@ final class TriPeaksSessionState {
   /// Number of rounds lost.
   final int roundsLost;
 
+  /// Number of rounds timed out.
+  final int roundsTimedOut;
+
   /// Number of rounds aborted.
   final int roundsAborted;
 
@@ -137,7 +159,7 @@ final class TriPeaksSessionState {
   int get roundsRemaining => ruleset.roundsPerGame - roundsCompleted;
 
   /// Whether the current round has ended.
-  bool get isCurrentRoundFinished => currentRound.isWon || currentRound.isLost;
+  bool get isCurrentRoundFinished => currentRound.isFinished;
 
   /// Whether all rounds in the session have been completed.
   bool get isSessionFinished => roundsCompleted >= ruleset.roundsPerGame;
@@ -177,6 +199,9 @@ final class TriPeaksSessionState {
     if (currentRound.isLost) {
       return TriPeaksSessionStatus.lost;
     }
+    if (currentRound.isTimedOut) {
+      return TriPeaksSessionStatus.timedOut;
+    }
     return TriPeaksSessionStatus.inProgress;
   }
 
@@ -187,6 +212,7 @@ final class TriPeaksSessionState {
     int? roundsCompleted,
     int? roundsWon,
     int? roundsLost,
+    int? roundsTimedOut,
     int? roundsAborted,
     List<RoundResult>? roundResults,
     TriPeaksState? currentRound,
@@ -197,6 +223,7 @@ final class TriPeaksSessionState {
       roundDecks: roundDecks,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
+      roundTimerConfig: roundTimerConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
       strikeTimerConfig: strikeTimerConfig,
@@ -205,6 +232,7 @@ final class TriPeaksSessionState {
       roundsCompleted: roundsCompleted ?? this.roundsCompleted,
       roundsWon: roundsWon ?? this.roundsWon,
       roundsLost: roundsLost ?? this.roundsLost,
+      roundsTimedOut: roundsTimedOut ?? this.roundsTimedOut,
       roundsAborted: roundsAborted ?? this.roundsAborted,
       roundResults: List<RoundResult>.unmodifiable(
         roundResults ?? this.roundResults,
@@ -219,6 +247,7 @@ final class TriPeaksSessionState {
     required List<List<Card>>? roundDecks,
     required ScoreConfig scoreConfig,
     required RoundRulesConfig roundRulesConfig,
+    required RoundTimerConfig roundTimerConfig,
     required UndoConfig undoConfig,
     required StreakConfig streakConfig,
     required StrikeTimerConfig strikeTimerConfig,
@@ -230,6 +259,7 @@ final class TriPeaksSessionState {
         roundNumber: roundNumber,
         scoreConfig: scoreConfig,
         roundRulesConfig: roundRulesConfig,
+        roundTimerConfig: roundTimerConfig,
         undoConfig: undoConfig,
         streakConfig: streakConfig,
         strikeTimerConfig: strikeTimerConfig,
@@ -243,6 +273,7 @@ final class TriPeaksSessionState {
       roundNumber: roundNumber,
       scoreConfig: scoreConfig,
       roundRulesConfig: roundRulesConfig,
+      roundTimerConfig: roundTimerConfig,
       undoConfig: undoConfig,
       streakConfig: streakConfig,
       strikeTimerConfig: strikeTimerConfig,
@@ -266,6 +297,7 @@ final class TriPeaksSessionState {
             .toList(growable: false),
       'scoreConfig': scoreConfig.toMap(),
       'roundRulesConfig': roundRulesConfig.toMap(),
+      'roundTimerConfig': roundTimerConfig.toMap(),
       'undoConfig': undoConfig.toMap(),
       'streakConfig': streakConfig.toMap(),
       'strikeTimerConfig': strikeTimerConfig.toMap(),
@@ -274,6 +306,7 @@ final class TriPeaksSessionState {
       'roundsCompleted': roundsCompleted,
       'roundsWon': roundsWon,
       'roundsLost': roundsLost,
+      'roundsTimedOut': roundsTimedOut,
       'roundsAborted': roundsAborted,
       'roundResults': roundResults.map((value) => value.toMap()).toList(
             growable: false,

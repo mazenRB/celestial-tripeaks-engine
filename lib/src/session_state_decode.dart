@@ -59,6 +59,22 @@ DecodeResult<TriPeaksSessionState> _decodeTriPeaksSessionState(
   if (!roundRulesResult.isSuccess) {
     return DecodeResult.failure(roundRulesResult.error!);
   }
+  final roundTimerConfigMap = map['roundTimerConfig'];
+  DecodeResult<RoundTimerConfig>? roundTimerConfigResult;
+  if (roundTimerConfigMap != null) {
+    if (roundTimerConfigMap is! Map<String, dynamic>) {
+      return const DecodeResult.failure(
+        DecodeFailure(
+          code: DecodeFailureCode.invalidPayload,
+          message: 'roundTimerConfig must be a map when present.',
+        ),
+      );
+    }
+    roundTimerConfigResult = RoundTimerConfig.tryFromMap(roundTimerConfigMap);
+    if (!roundTimerConfigResult.isSuccess) {
+      return DecodeResult.failure(roundTimerConfigResult.error!);
+    }
+  }
   final undoConfigMap = map['undoConfig'];
   if (undoConfigMap is! Map<String, dynamic>) {
     return const DecodeResult.failure(
@@ -128,11 +144,13 @@ DecodeResult<TriPeaksSessionState> _decodeTriPeaksSessionState(
   final roundsCompleted = map['roundsCompleted'];
   final roundsWon = map['roundsWon'];
   final roundsLost = map['roundsLost'];
+  final roundsTimedOut = map['roundsTimedOut'];
   final roundsAborted = map['roundsAborted'];
   if (currentRoundNumber is! int ||
       roundsCompleted is! int ||
       roundsWon is! int ||
       roundsLost is! int ||
+      (roundsTimedOut != null && roundsTimedOut is! int) ||
       roundsAborted is! int) {
     return const DecodeResult.failure(
       DecodeFailure(
@@ -210,6 +228,19 @@ DecodeResult<TriPeaksSessionState> _decodeTriPeaksSessionState(
       roundDecks.add(decodedDeck.value!);
     }
   }
+  final resolvedRoundTimerConfig =
+      roundTimerConfigResult?.value ?? const RoundTimerConfig();
+  if (_roundTimerConfigValidationMessage(
+        resolvedRoundTimerConfig,
+        rulesetResult.value!.roundsPerGame,
+      ) case final timerError?) {
+    return DecodeResult.failure(
+      DecodeFailure(
+        code: DecodeFailureCode.invalidPayload,
+        message: timerError,
+      ),
+    );
+  }
 
   return DecodeResult.success(
     TriPeaksSessionState._(
@@ -222,6 +253,7 @@ DecodeResult<TriPeaksSessionState> _decodeTriPeaksSessionState(
             ),
       scoreConfig: scoreConfigResult.value!,
       roundRulesConfig: roundRulesResult.value!,
+      roundTimerConfig: resolvedRoundTimerConfig,
       undoConfig: undoConfigResult.value!,
       streakConfig: streakConfigResult.value!,
       strikeTimerConfig: strikeTimerConfigResult.value!,
@@ -230,6 +262,7 @@ DecodeResult<TriPeaksSessionState> _decodeTriPeaksSessionState(
       roundsCompleted: roundsCompleted,
       roundsWon: roundsWon,
       roundsLost: roundsLost,
+      roundsTimedOut: roundsTimedOut as int? ?? 0,
       roundsAborted: roundsAborted,
       roundResults: List<RoundResult>.unmodifiable(roundResults),
       currentRound: currentRound,
