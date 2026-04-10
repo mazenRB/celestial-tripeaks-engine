@@ -64,6 +64,7 @@ void main() {
       const config = ScoreConfig(
         penaltyInvalidAction: -3,
         allowNegativeTotalScore: false,
+        resetTimeBonusOnInvalidPenalty: true,
       );
 
       final decoded = ScoreConfig.tryFromMap(config.toMap());
@@ -71,6 +72,7 @@ void main() {
       expect(decoded.isSuccess, isTrue);
       expect(decoded.value!.penaltyInvalidAction, -3);
       expect(decoded.value!.allowNegativeTotalScore, isFalse);
+      expect(decoded.value!.resetTimeBonusOnInvalidPenalty, isTrue);
     });
 
     test('score config decode defaults missing allowNegativeTotalScore to true',
@@ -85,6 +87,23 @@ void main() {
       expect(decoded.isSuccess, isTrue);
       expect(decoded.value!.penaltyInvalidAction, -3);
       expect(decoded.value!.allowNegativeTotalScore, isTrue);
+      expect(decoded.value!.resetTimeBonusOnInvalidPenalty, isFalse);
+    });
+
+    test(
+        'score config decode defaults missing resetTimeBonusOnInvalidPenalty to false',
+        () {
+      final map = const ScoreConfig(
+        penaltyInvalidAction: -3,
+        resetTimeBonusOnInvalidPenalty: true,
+      ).toMap()
+        ..remove('resetTimeBonusOnInvalidPenalty');
+
+      final decoded = ScoreConfig.tryFromMap(map);
+
+      expect(decoded.isSuccess, isTrue);
+      expect(decoded.value!.penaltyInvalidAction, -3);
+      expect(decoded.value!.resetTimeBonusOnInvalidPenalty, isFalse);
     });
 
     test('round timer config round-trip preserves mixed schedule', () {
@@ -122,9 +141,14 @@ void main() {
         enabled: true,
         durationsSecondsByRound: <int>[5, 0, 7],
       );
+      const scoreConfig = ScoreConfig(
+        penaltyInvalidAction: -3,
+        resetTimeBonusOnInvalidPenalty: true,
+      );
       final replay = ReplaySession.newSession(
         seed: 9,
         ruleset: TriPeaksRuleset.threeRounds,
+        scoreConfig: scoreConfig,
         roundTimerConfig: roundTimerConfig,
       );
       final replayDecoded = ReplaySession.tryFromMap(replay.toMap());
@@ -133,6 +157,10 @@ void main() {
         replayDecoded.value!.roundTimerConfig.durationsSecondsByRound,
         equals(roundTimerConfig.durationsSecondsByRound),
       );
+      expect(
+        replayDecoded.value!.scoreConfig.resetTimeBonusOnInvalidPenalty,
+        isTrue,
+      );
 
       final matchConfig = MatchConfig(
         matchMode: MatchMode.realtime,
@@ -140,6 +168,7 @@ void main() {
         matchSeed: 42,
         maxPlayers: 2,
         ruleset: TriPeaksRuleset.threeRounds,
+        scoreConfig: scoreConfig,
         roundTimerConfig: roundTimerConfig,
       );
       final matchDecoded = MatchConfig.tryFromMap(matchConfig.toMap());
@@ -147,6 +176,10 @@ void main() {
       expect(
         matchDecoded.value!.roundTimerConfig.durationsSecondsByRound,
         equals(roundTimerConfig.durationsSecondsByRound),
+      );
+      expect(
+        matchDecoded.value!.scoreConfig.resetTimeBonusOnInvalidPenalty,
+        isTrue,
       );
     });
 
@@ -278,6 +311,7 @@ void main() {
       expect(restored.stock, equals(progressed.stock));
       expect(restored.scoreConfig.penaltyInvalidAction, -3);
       expect(restored.scoreConfig.allowNegativeTotalScore, isTrue);
+      expect(restored.scoreConfig.resetTimeBonusOnInvalidPenalty, isFalse);
       expect(restored.scoreState.totalScore, progressed.scoreState.totalScore);
       expect(
         restored.streakState.currentStreak,

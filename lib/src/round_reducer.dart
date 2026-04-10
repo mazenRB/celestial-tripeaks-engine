@@ -96,6 +96,13 @@ TriPeaksReduceResult tryReduceTriPeaks(
       preprocessed.bonusSlotsConfig,
       nextStreakState,
     );
+    final nextTimeBonusState =
+        preprocessed.scoreConfig.resetTimeBonusOnInvalidPenalty
+            ? _onTimeBonusResetOnDraw(
+                preprocessed.timeBonusTimerState,
+                preprocessed.scoreConfig,
+              )
+            : preprocessed.timeBonusTimerState;
     final nextScoreState = preprocessed.scoreState.applyDelta(
       penalty,
       allowNegativeTotalScore: preprocessed.scoreConfig.allowNegativeTotalScore,
@@ -107,6 +114,7 @@ TriPeaksReduceResult tryReduceTriPeaks(
         scoreState: nextScoreState,
         streakState: nextStreakState,
         strikeTimerState: nextStrikeTimerState,
+        timeBonusTimerState: nextTimeBonusState,
         bonusSlotsState: nextBonusSlotsState,
       ),
       scoreDelta: nextScoreState.lastDelta,

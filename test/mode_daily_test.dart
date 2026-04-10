@@ -37,6 +37,7 @@ void main() {
       expect(bundle.scoreConfig.pointsTableauToWaste, 4096);
       expect(bundle.scoreConfig.penaltyInvalidAction, -20000);
       expect(bundle.scoreConfig.allowNegativeTotalScore, isTrue);
+      expect(bundle.scoreConfig.resetTimeBonusOnInvalidPenalty, isFalse);
       expect(bundle.scoreConfig.pointsPeakCleared, 200000);
       expect(bundle.scoreConfig.pointsPerRemainingStockCardOnWin, 50000);
       expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.streak);
@@ -78,6 +79,7 @@ void main() {
       expect(bundle.scoreConfig.pointsTableauToWaste, 4096);
       expect(bundle.scoreConfig.penaltyInvalidAction, -20000);
       expect(bundle.scoreConfig.allowNegativeTotalScore, isFalse);
+      expect(bundle.scoreConfig.resetTimeBonusOnInvalidPenalty, isTrue);
       expect(bundle.scoreConfig.pointsPeakCleared, 200000);
       expect(bundle.scoreConfig.pointsPerRemainingStockCardOnWin, 50000);
       expect(bundle.scoreConfig.multiplierMode, ScoreMultiplierMode.timeBonus);

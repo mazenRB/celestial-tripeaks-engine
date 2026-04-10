@@ -117,6 +117,107 @@ void main() {
       expect(draw.state.timeBonusTimerState.deadlineToken, token);
     });
 
+    test('invalid action preserves timer state when reset flag is disabled',
+        () {
+      final config = const ScoreConfig(
+        multiplierMode: ScoreMultiplierMode.timeBonus,
+        timeBonusSecondsPerMove: 2,
+        timeBonusMaxSeconds: 10,
+        penaltyInvalidAction: -3,
+      );
+      var state = TriPeaksState.newGame(
+        deck: buildStreakUnlockDeck(),
+        scoreConfig: config,
+      );
+
+      state = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(18),
+      ).state;
+      final timerBefore = state.timeBonusTimerState;
+
+      final invalid = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(99),
+      );
+
+      expect(invalid.isSuccess, isFalse);
+      expect(invalid.state.timeBonusTimerState, timerBefore);
+    });
+
+    test('invalid action resets timer state when reset flag is enabled', () {
+      final config = const ScoreConfig(
+        multiplierMode: ScoreMultiplierMode.timeBonus,
+        timeBonusSecondsPerMove: 2,
+        timeBonusMaxSeconds: 10,
+        penaltyInvalidAction: -3,
+        resetTimeBonusOnInvalidPenalty: true,
+      );
+      var state = TriPeaksState.newGame(
+        deck: buildStreakUnlockDeck(),
+        scoreConfig: config,
+      );
+
+      state = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(18),
+      ).state;
+      final tokenBefore = state.timeBonusTimerState.deadlineToken;
+      expect(state.timeBonusTimerState.remainingSeconds, greaterThan(0));
+
+      final invalid = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(99),
+      );
+
+      expect(invalid.isSuccess, isFalse);
+      expect(invalid.state.timeBonusTimerState.remainingSeconds, 0);
+      expect(invalid.state.timeBonusTimerState.stepCount, 0);
+      expect(
+        invalid.state.timeBonusTimerState.deadlineToken,
+        tokenBefore + 1,
+      );
+    });
+
+    test('invalid action reset still applies when penalty is clamped at zero',
+        () {
+      final config = const ScoreConfig(
+        pointsTableauToWaste: 0,
+        multiplierMode: ScoreMultiplierMode.timeBonus,
+        timeBonusSecondsPerMove: 2,
+        timeBonusMaxSeconds: 10,
+        penaltyInvalidAction: -3,
+        allowNegativeTotalScore: false,
+        resetTimeBonusOnInvalidPenalty: true,
+      );
+      var state = TriPeaksState.newGame(
+        deck: buildStreakUnlockDeck(),
+        scoreConfig: config,
+      );
+
+      state = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(18),
+      ).state;
+      final tokenBefore = state.timeBonusTimerState.deadlineToken;
+      expect(state.scoreState.totalScore, 0);
+
+      final invalid = tryReduceTriPeaks(
+        state,
+        const RemoveTableauCardAction(99),
+      );
+
+      expect(invalid.isSuccess, isFalse);
+      expect(invalid.scoreDelta, 0);
+      expect(invalid.state.scoreState.totalScore, 0);
+      expect(invalid.state.timeBonusTimerState.remainingSeconds, 0);
+      expect(invalid.state.timeBonusTimerState.stepCount, 0);
+      expect(
+        invalid.state.timeBonusTimerState.deadlineToken,
+        tokenBefore + 1,
+      );
+    });
+
     test('time bonus expiry validates token and does not affect bonus slots',
         () {
       final config = const ScoreConfig(
