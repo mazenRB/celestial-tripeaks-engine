@@ -91,12 +91,12 @@ jobs:
           set -euo pipefail
 
           version="${GITHUB_REF_NAME#v}"
-          awk "
+          awk -v version="$version" '
             BEGIN {in_section=0}
-            \$0 ~ \"^## \\\[$version\\\]\" {in_section=1; next}
-            in_section && \$0 ~ /^## \\\[/ {exit}
+            $0 ~ ("^## \\[" version "\\]") {in_section=1; next}
+            in_section && $0 ~ /^## \[/ {exit}
             in_section {print}
-          " CHANGELOG.md > "${RUNNER_TEMP}/release_notes.md"
+          ' CHANGELOG.md > "${RUNNER_TEMP}/release_notes.md"
 
           if [[ ! -s "${RUNNER_TEMP}/release_notes.md" ]]; then
             echo "Failed to extract release notes for $version."

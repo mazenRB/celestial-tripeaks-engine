@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0-beta.4] - 2026-04-11
+
+### Fixed
+
+- Corrected GitHub release note extraction in the private release workflow so
+  tagged releases can complete successfully.
+
 ## [1.0.0-beta.3] - 2026-04-11
 
 ### Changed
