@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0-rc.1] - 2026-04-11
+
+### Changed
+
+- Promoted the package line from beta to the first release candidate with no
+  gameplay or API changes from `1.0.0-beta.4`.
+
 ## [1.0.0-beta.4] - 2026-04-11
 
 ### Fixed
