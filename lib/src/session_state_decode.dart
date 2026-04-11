@@ -231,9 +231,10 @@ DecodeResult<TriPeaksSessionState> _decodeTriPeaksSessionState(
   final resolvedRoundTimerConfig =
       roundTimerConfigResult?.value ?? const RoundTimerConfig();
   if (_roundTimerConfigValidationMessage(
-        resolvedRoundTimerConfig,
-        rulesetResult.value!.roundsPerGame,
-      ) case final timerError?) {
+    resolvedRoundTimerConfig,
+    rulesetResult.value!.roundsPerGame,
+  )
+      case final timerError?) {
     return DecodeResult.failure(
       DecodeFailure(
         code: DecodeFailureCode.invalidPayload,

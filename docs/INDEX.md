@@ -56,6 +56,10 @@ Last updated: 2026-02-21
   - Audience: Contributors
   - Purpose: setup, quality gates, PR checklist
 
+- `release_process.md`
+  - Audience: Contributors, release managers
+  - Purpose: tagged release steps, workflow gates, prerelease policy
+
 - `../CHANGELOG.md`
   - Audience: Contributors, release managers
   - Purpose: release notes and contract change tracking

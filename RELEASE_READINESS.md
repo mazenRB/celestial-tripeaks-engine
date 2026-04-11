@@ -7,6 +7,9 @@ This checklist is the minimum bar before publishing a release.
 - `dart format --output=none --set-exit-if-changed .`
 - `dart analyze`
 - `dart test`
+- tag version matches `pubspec.yaml`
+- `CHANGELOG.md` contains a matching release section
+- `dart pub publish --dry-run` passes in the release validation tree
 
 ## Determinism and compatibility checks
 

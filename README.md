@@ -108,8 +108,14 @@ import 'package:celestial_tripeaks/tripeaks_engine.dart';
 import 'package:celestial_tripeaks/tripeaks_replay.dart';
 
 void main() {
-  var session = TriPeaksSessionState.newSession(seed: 42);
-  var replay = TriPeaksReplay.newSession(seed: 42);
+  var session = TriPeaksSessionState.newSession(
+    ruleset: TriPeaksRuleset.threeRounds,
+    seed: 42,
+  );
+  var replay = TriPeaksReplay.newSession(
+    seed: 42,
+    ruleset: TriPeaksRuleset.threeRounds,
+  );
 
   final recorded = recordAction(
     replay,
@@ -185,3 +191,16 @@ Current gates:
 - format check
 - static analysis
 - test suite
+
+## Releases
+
+Private package releases are cut from git tags such as `v1.0.0-beta.3`.
+
+The release workflow:
+- requires the tag to match `pubspec.yaml`
+- requires a matching `CHANGELOG.md` entry
+- reruns format, analysis, and tests
+- runs `dart pub publish --dry-run` against a temporary release tree
+- creates a GitHub Release, marking prerelease tags as prereleases
+
+Detailed steps: [docs/release_process.md](docs/release_process.md)

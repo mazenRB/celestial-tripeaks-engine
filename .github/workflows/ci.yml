@@ -1,5 +1,8 @@
 name: CI
 
+env:
+  DART_SDK_VERSION: 3.11.4
+
 on:
   push:
     branches:
@@ -17,6 +20,8 @@ jobs:
 
       - name: Setup Dart
         uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ env.DART_SDK_VERSION }}
 
       - name: Resolve dependencies
         run: dart pub get

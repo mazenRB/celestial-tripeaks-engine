@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0-beta.3] - 2026-04-11
+
 ### Changed
 
 - Package surface is now layered into supported entrypoints:
@@ -19,6 +21,14 @@ All notable changes to this project are documented in this file.
 
 - Added entrypoint guidance and import examples for core, replay,
   multiplayer, and authority consumers.
+
+### Quality
+
+- Fixed the CI formatting drift in `session_state_decode.dart`.
+- Added a tagged release workflow with strict version, changelog, and
+  package dry-run validation for private GitHub releases.
+- Added package-release metadata, proprietary license notice, and a minimal
+  example for future pub-quality packaging readiness.
 
 ## [1.0.0-beta.2] - 2026-03-26
 

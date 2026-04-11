@@ -1,7 +1,10 @@
 name: celestial_tripeaks
 description: Classic Solitaire TriPeaks game engine in pure Dart.
-version: 1.0.0-beta.2
+version: 1.0.0-beta.3
 publish_to: none
+homepage: https://github.com/mazenRB/celestial-tripeaks-engine
+repository: https://github.com/mazenRB/celestial-tripeaks-engine
+issue_tracker: https://github.com/mazenRB/celestial-tripeaks-engine/issues
 
 environment:
   sdk: ^3.3.0
