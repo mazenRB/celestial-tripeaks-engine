@@ -8,6 +8,13 @@ Celestial TriPeaks is structured as a deterministic game engine that can be
 embedded in local applications, backend services, and authoritative
 multiplayer hosts.
 
+Public package layers:
+
+- `tripeaks_engine.dart` for mechanics, sessions, presets, and helpers
+- `tripeaks_replay.dart` for replay/save flows
+- `tripeaks_multiplayer.dart` for match orchestration
+- `tripeaks_authority.dart` for host/runtime authority flows
+
 ## Layering Boundaries
 
 ### 1) Mechanics Layer (Pure State Machine)

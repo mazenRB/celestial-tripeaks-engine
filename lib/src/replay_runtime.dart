@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Appends a replay entry from one attempted [action] and [result].
 ReplaySession recordAttempt(

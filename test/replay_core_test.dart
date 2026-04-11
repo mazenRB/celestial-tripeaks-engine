@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
+import 'package:celestial_tripeaks/tripeaks_replay.dart';
 import 'package:test/test.dart';
 
 void main() {

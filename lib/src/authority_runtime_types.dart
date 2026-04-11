@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Host-provided context for one authority apply attempt.
 final class AuthorityRequestContext {

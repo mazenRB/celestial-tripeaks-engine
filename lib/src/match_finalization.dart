@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Returns whether [matchState] can be finalized under [config].
 bool canFinalize(

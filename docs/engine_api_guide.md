@@ -2,8 +2,18 @@
 
 Last updated: 2026-03-27
 
-This guide focuses on practical integration using the public export surface in
-`lib/tripeaks_engine.dart`.
+This guide focuses on practical integration using the package entrypoints.
+
+## Import Map
+
+- `package:celestial_tripeaks/tripeaks_engine.dart`
+  - core round/session, configs, presets, daily helpers
+- `package:celestial_tripeaks/tripeaks_replay.dart`
+  - replay, replay verification, save/load
+- `package:celestial_tripeaks/tripeaks_multiplayer.dart`
+  - match orchestration, match scoring, finalization
+- `package:celestial_tripeaks/tripeaks_authority.dart`
+  - authority runtime, reconnect, persistence contracts
 
 ## Core Types You Will Use
 
@@ -33,12 +43,14 @@ This guide focuses on practical integration using the public export surface in
 
 ### Replay
 
+- Import with `tripeaks_engine.dart` for shared core types.
 - `TriPeaksReplay` (`ReplaySession` alias)
 - `recordAction(...)`
-- `replayAccepted(...)`
+- `replayToState(...)`
 
 ### Match/Multiplayer
 
+- Import with `tripeaks_engine.dart` for shared config and action types.
 - `MatchConfig`, `MatchState`, `MatchEvent`
 - `tryReduceMatch(...)`
 - `replayMatchEvents(...)`
@@ -61,6 +73,7 @@ This guide focuses on practical integration using the public export surface in
 
 ### Authority Runtime
 
+- Import with `tripeaks_engine.dart` and `tripeaks_multiplayer.dart`.
 - `AuthorityRuntime`
 - `AuthorityRuntimeState`
 - `AuthorityRequestContext`
@@ -159,6 +172,9 @@ generation reuse.
 ### 3) Replay Logging
 
 ```dart
+import 'package:celestial_tripeaks/tripeaks_engine.dart';
+import 'package:celestial_tripeaks/tripeaks_replay.dart';
+
 var replay = TriPeaksReplay.newSession(
   seed: session.seed ?? TriPeaksSessionState.defaultSeed,
   ruleset: session.ruleset,

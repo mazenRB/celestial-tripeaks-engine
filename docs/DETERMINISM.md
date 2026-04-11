@@ -2,6 +2,11 @@
 
 This engine is built around deterministic simulation.
 
+Import guidance:
+
+- `tripeaks_engine.dart` for state/session fingerprints
+- `tripeaks_replay.dart` for replay logging and replay fingerprints
+
 ## Deterministic Inputs
 
 A state transition is fully determined by:
@@ -64,4 +69,3 @@ On decode:
 - no internal timers
 - no unseeded randomness
 - no platform `hashCode` for deterministic decisions
-

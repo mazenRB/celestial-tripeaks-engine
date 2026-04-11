@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Component-level explanation for one applied score delta.
 final class ScoreDeltaBreakdown {

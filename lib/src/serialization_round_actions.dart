@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Serializes one round action with schema/type envelope.
 Map<String, dynamic> roundActionToMap(TriPeaksAction action) {

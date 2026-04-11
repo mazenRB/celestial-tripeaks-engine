@@ -274,6 +274,9 @@ Risk notes:
 
 ### `AuthorityRuntimeConfig`
 
+Import from `tripeaks_authority.dart` together with the core and multiplayer
+entrypoints.
+
 Defaults:
 
 - `snapshotEveryAccepted = 100`

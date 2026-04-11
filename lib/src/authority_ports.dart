@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Store abstraction for accepted events and snapshots.
 abstract interface class AuthorityStorePort {

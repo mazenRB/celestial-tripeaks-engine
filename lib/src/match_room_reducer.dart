@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Applies one [event] to [state] using pure deterministic reducer.
 MatchReduceResult tryReduceMatch(MatchState state, MatchEvent event) {

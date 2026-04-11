@@ -1,0 +1,52 @@
+/// Advanced public entrypoint for match orchestration and competitive scoring.
+///
+/// Import this library together with `tripeaks_engine.dart` when you need
+/// multiplayer rooms, match reducers, or competitive result calculation.
+library;
+
+export 'src/tripeaks_engine_internal.dart'
+    show
+        MatchMode,
+        MatchStatus,
+        PlayerStatus,
+        MatchConfig,
+        MatchPlayerState,
+        MatchState,
+        MatchEvent,
+        JoinMatchEvent,
+        LeaveMatchEvent,
+        StartMatchEvent,
+        SubmitMatchActionEvent,
+        tryDecodeMatchEvent,
+        MatchReduceFailureCode,
+        MatchReduceFailure,
+        MatchReduceResult,
+        tryReduceMatch,
+        replayMatchEvents,
+        MatchTieBreakerPolicy,
+        MatchTimeoutPolicy,
+        MatchScoringConfig,
+        MatchScoreBreakdown,
+        MatchPlacement,
+        MatchResult,
+        computeMatchResults,
+        MatchFinishCondition,
+        MatchFinalizationConfig,
+        MatchPlayerOutcome,
+        FinalPlayerBreakdown,
+        FinalMatchResult,
+        FinalizeFailureCode,
+        FinalizeFailure,
+        FinalizeResult,
+        finalizeMatch,
+        MatchScoreConfig,
+        MatchScoreErrorCode,
+        MatchScoreError,
+        MatchScoreReduceResult,
+        MatchScoreEvent,
+        RoundScoreAggregated,
+        FirstFinishBonusApplied,
+        RankingAdjustmentApplied,
+        MatchScoreState,
+        reduceMatchScore,
+        tryReduceMatchScore;

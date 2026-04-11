@@ -8,6 +8,20 @@ This project is designed so you can:
 - save/load safely with integrity checks
 - support single-player and multiplayer orchestration layers
 
+## Public Entry Points
+
+Use the package entrypoint that matches the layer you need:
+
+- `package:celestial_tripeaks/tripeaks_engine.dart`
+  - core round/session engine
+  - configs, presets, daily helpers, deal policy, hints
+- `package:celestial_tripeaks/tripeaks_replay.dart`
+  - replay logging, replay reconstruction, save/load envelopes
+- `package:celestial_tripeaks/tripeaks_multiplayer.dart`
+  - match orchestration, competitive scoring, match finalization
+- `package:celestial_tripeaks/tripeaks_authority.dart`
+  - authority runtime, reconnect, persistence contracts, in-memory store
+
 ## Who This Is For
 
 - Beginners who want to test TriPeaks logic quickly via CLI
@@ -87,6 +101,56 @@ void main() {
 }
 ```
 
+## Replay Usage (Code)
+
+```dart
+import 'package:celestial_tripeaks/tripeaks_engine.dart';
+import 'package:celestial_tripeaks/tripeaks_replay.dart';
+
+void main() {
+  var session = TriPeaksSessionState.newSession(seed: 42);
+  var replay = TriPeaksReplay.newSession(seed: 42);
+
+  final recorded = recordAction(
+    replay,
+    session,
+    const PlayRoundAction(DrawFromStockAction()),
+    tick: 1,
+  );
+
+  replay = recorded.replay;
+  session = recorded.state;
+  print(replayFingerprint(replay));
+  print(sessionFingerprint(session));
+}
+```
+
+## Multiplayer / Authority Usage (Code)
+
+```dart
+import 'package:celestial_tripeaks/tripeaks_engine.dart';
+import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_authority.dart';
+
+void main() {
+  final match = MatchState.newMatch(
+    config: MatchConfig(
+      matchMode: MatchMode.realtime,
+      matchId: 'match-1',
+      matchSeed: 42,
+      maxPlayers: 2,
+    ),
+  );
+
+  final runtime = AuthorityRuntime(
+    store: InMemoryAuthorityStore(),
+    initialMatchState: match,
+  );
+
+  print(runtime);
+}
+```
+
 ## Determinism Contract
 
 Same inputs => same outputs.
@@ -121,4 +185,3 @@ Current gates:
 - format check
 - static analysis
 - test suite
-

@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 int _computeAppliedMultiplier(int currentStreak, ScoreConfig config) {
   final normalizedMax = config.multiplierMax < 1 ? 1 : config.multiplierMax;

@@ -1,0 +1,73 @@
+/// Internal umbrella library for the deterministic TriPeaks engine.
+///
+/// Public consumers should import one of the package entrypoints in `lib/`
+/// instead of importing this library directly.
+library;
+
+import 'dart:convert';
+import 'dart:math';
+
+part 'model.dart';
+part 'model_daily.dart';
+part 'round_config.dart';
+part 'round_config_score_config.dart';
+part 'round_config_score_breakdown.dart';
+part 'round_config_score_state.dart';
+part 'round_config_streak.dart';
+part 'round_config_rules.dart';
+part 'round_config_timers.dart';
+part 'round_config_bonus.dart';
+part 'round_config_hint.dart';
+part 'match_scoring_types.dart';
+part 'engine_types.dart';
+part 'engine_types_actions.dart';
+part 'mode_bundle.dart';
+part 'serialization.dart';
+part 'serialization_round_actions.dart';
+part 'serialization_session_actions.dart';
+part 'round_state.dart';
+part 'round_state_queries.dart';
+part 'round_state_decode.dart';
+part 'session_state.dart';
+part 'session_state_decode.dart';
+part 'daily.dart';
+part 'deal_policy.dart';
+part 'deal_policy_solver.dart';
+part 'replay.dart';
+part 'replay_action_types.dart';
+part 'replay_entry_types.dart';
+part 'replay_runtime.dart';
+part 'save.dart';
+part 'query.dart';
+part 'match_room.dart';
+part 'match_room_types.dart';
+part 'match_room_player_state.dart';
+part 'match_room_state.dart';
+part 'match_room_events.dart';
+part 'match_room_reduce_types.dart';
+part 'match_room_reducer.dart';
+part 'match_competitive.dart';
+part 'match_finalization_types.dart';
+part 'match_finalization.dart';
+part 'server_authority_protocol_types.dart';
+part 'server_authority_state_types.dart';
+part 'server_authority_reconnect_types.dart';
+part 'server_authority.dart';
+part 'authority_runtime_config.dart';
+part 'authority_ports.dart';
+part 'authority_persistence_types.dart';
+part 'authority_runtime_errors.dart';
+part 'authority_runtime_types.dart';
+part 'authority_runtime.dart';
+part 'authority_runtime_restore_helpers.dart';
+part 'authority_store_memory.dart';
+part 'round_reducer.dart';
+part 'round_reducer_action_handlers.dart';
+part 'round_reducer_helpers_scoring.dart';
+part 'round_reducer_helpers_bonus_slots.dart';
+part 'round_reducer_helpers_streak_strike.dart';
+part 'session_reducer.dart';
+part 'session_reducer_validation.dart';
+part 'session_reducer_snapshot.dart';
+part 'match_scoring_reducer.dart';
+part 'game_wrapper.dart';

@@ -4,6 +4,10 @@ Last updated: 2026-02-21
 
 This document defines durable payload shapes for the authority runtime.
 
+These payloads live in the authority layer and are exposed through
+`tripeaks_authority.dart` together with the multiplayer entrypoint for
+`MatchState`.
+
 ## Sequence Model
 
 - `authoritativeSequence` starts at `0` for an empty baseline.

@@ -1,4 +1,5 @@
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
+import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
 import 'package:test/test.dart';
 
 import 'test_support.dart';
