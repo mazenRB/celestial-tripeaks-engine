@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Package surface is now layered into supported entrypoints:
+  - `tripeaks_engine.dart` for core engine flows
+  - `tripeaks_replay.dart` for replay/save helpers
+  - `tripeaks_multiplayer.dart` for match orchestration
+  - `tripeaks_authority.dart` for authority/runtime contracts
+- Internal engine implementation now lives behind a dedicated `src`
+  umbrella library so public exports can be curated without changing engine
+  behavior.
+
+### Documentation
+
+- Added entrypoint guidance and import examples for core, replay,
+  multiplayer, and authority consumers.
+
 ## [1.0.0-beta.2] - 2026-03-26
 
 ### Added

@@ -27,6 +27,7 @@ flutter pub get
 ```dart
 import 'package:flutter/foundation.dart';
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
+import 'package:celestial_tripeaks/tripeaks_replay.dart';
 
 class TriPeaksController extends ChangeNotifier {
   TriPeaksController() {
@@ -171,4 +172,3 @@ class _GamePageState extends State<GamePage> {
 - Using real time (`DateTime.now`) to influence core game state.
 - Forgetting to record replay entries when applying actions.
 - Treating invalid actions as exceptions (they are typed failures/results).
-

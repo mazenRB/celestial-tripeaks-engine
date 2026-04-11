@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// In-memory reference store for authority runtime.
 final class InMemoryAuthorityStore implements AuthorityStorePort {

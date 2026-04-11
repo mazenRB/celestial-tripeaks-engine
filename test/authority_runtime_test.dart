@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:celestial_tripeaks/tripeaks_engine.dart';
+import 'package:celestial_tripeaks/tripeaks_authority.dart';
+import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -289,7 +290,13 @@ void main() {
   });
 
   test('engine source does not call DateTime.now', () {
-    final source = File('lib/tripeaks_engine.dart').readAsStringSync();
-    expect(source.contains('DateTime.now('), isFalse);
+    final sources = Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.dart'))
+        .map((file) => file.readAsStringSync())
+        .join('\n');
+
+    expect(sources.contains('DateTime.now('), isFalse);
   });
 }

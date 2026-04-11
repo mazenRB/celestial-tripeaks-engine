@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Full server-authoritative state wrapper.
 final class ServerAuthorityState {

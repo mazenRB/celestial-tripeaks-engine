@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 DecodeResult<TriPeaksState> _triPeaksStateTryFromMap(Map<String, dynamic> map) {
   if (map['schemaVersion'] != _serializationSchemaV1) {

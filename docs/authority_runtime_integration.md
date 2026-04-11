@@ -7,6 +7,12 @@ Last updated: 2026-02-21
 `AuthorityRuntime` provides a host-facing orchestration layer that couples
 pure match reducers with durable accepted-event logs and periodic snapshots.
 
+Imports:
+
+- `package:celestial_tripeaks/tripeaks_engine.dart`
+- `package:celestial_tripeaks/tripeaks_multiplayer.dart`
+- `package:celestial_tripeaks/tripeaks_authority.dart`
+
 ## Key Types
 
 - `AuthorityRuntime`

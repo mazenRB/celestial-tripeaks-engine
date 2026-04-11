@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Config for additive match-level scoring outside round mechanics.
 final class MatchScoreConfig {

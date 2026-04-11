@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Orchestrates durability and restore around pure deterministic reducers.
 final class AuthorityRuntime {

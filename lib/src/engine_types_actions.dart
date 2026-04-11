@@ -1,4 +1,4 @@
-part of '../tripeaks_engine.dart';
+part of 'tripeaks_engine_internal.dart';
 
 /// Base type for all TriPeaks actions.
 sealed class TriPeaksAction {
