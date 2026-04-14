@@ -4,6 +4,34 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Minimal deterministic room foundation under `tripeaks_multiplayer.dart`:
+  - `RoomConfig`
+  - `RoomState`
+  - `RoomMemberState`
+  - `RoomEvent`
+  - `RoomReduceResult`
+  - `MatchBootstrap`
+- Canonical room-to-match bootstrap flow with deterministic host ownership,
+  host transfer, and start validation.
+
+### Changed
+
+- Multiplayer architecture is now explicitly split into:
+  - room foundation for pre-match deterministic coordination
+  - live match state for gameplay
+- `MatchState` is now a live-match baseline created from a fixed player roster.
+- Authority/runtime flows remain match-scoped and no longer treat join/start
+  as live match events.
+
+### Documentation
+
+- Added `docs/room_foundation.md`.
+- Clarified that engine-owned room payloads must not absorb invites,
+  moderation, discovery, presence, notifications, platform identity, or
+  backend-specific schema concerns.
+
 ## [1.0.0-rc.1] - 2026-04-11
 
 ### Changed

@@ -38,12 +38,14 @@ Primary constant:
 Examples:
 
 - `round_action`, `session_action`
+- `room_event`
 - state/config payloads with specific `type` fields
 
 Entry points:
 
 - `roundActionToMap` / `roundActionFromMap`
 - `sessionActionToMap` / `sessionActionFromMap`
+- `tryDecodeRoomEvent(...)`
 - `decodeStateMap` / `decodeActionMap`
 
 ### 2) Save Envelopes
@@ -105,3 +107,6 @@ When introducing schema v2+:
 - Log decode failures with version and type context.
 - Use fingerprints for integrity checks in save/restore and authority replay
   boundaries.
+- Treat room payloads as deterministic bootstrap contracts, not backend lobby
+  documents. Do not attach invites, moderation, discovery, presence, or
+  provider-specific fields to engine-owned room maps.

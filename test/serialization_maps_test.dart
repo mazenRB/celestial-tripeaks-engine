@@ -185,6 +185,72 @@ void main() {
       );
     });
 
+    test('room payloads round-trip and exclude lobby product fields', () {
+      final roomConfig = RoomConfig(
+        roomId: 'room-1',
+        matchMode: MatchMode.realtime,
+        minMembers: 2,
+        maxMembers: 4,
+        roundTimerConfig: const RoundTimerConfig(
+          enabled: true,
+          durationsSecondsByRound: <int>[5, 0, 7],
+        ),
+      );
+      final roomState = RoomState.newRoom(config: roomConfig);
+      final member = const RoomMemberState(
+        memberId: 'p1',
+        joinOrder: 1,
+        status: RoomMemberStatus.joined,
+      );
+      final roomEvent = const StartRoomMatchEvent(
+        requestedByMemberId: 'p1',
+        matchId: 'match-1',
+        matchSeed: 77,
+      );
+      final bootstrap = MatchBootstrap(
+        schemaVersion: 1,
+        engineVersion: 1,
+        roomId: 'room-1',
+        matchId: 'match-1',
+        matchOrdinal: 1,
+        matchConfig: const MatchConfig(
+          matchMode: MatchMode.realtime,
+          matchId: 'match-1',
+          matchSeed: 77,
+          maxPlayers: 2,
+        ),
+        matchState: MatchState.newMatch(
+          config: const MatchConfig(
+            matchMode: MatchMode.realtime,
+            matchId: 'match-1',
+            matchSeed: 77,
+            maxPlayers: 2,
+          ),
+          playerIds: const <String>['p1', 'p2'],
+        ),
+      );
+
+      expect(RoomConfig.tryFromMap(roomConfig.toMap()).isSuccess, isTrue);
+      expect(RoomState.tryFromMap(roomState.toMap()).isSuccess, isTrue);
+      expect(RoomMemberState.tryFromMap(member.toMap()).isSuccess, isTrue);
+      expect(tryDecodeRoomEvent(roomEvent.toMap()).isSuccess, isTrue);
+      expect(MatchBootstrap.tryFromMap(bootstrap.toMap()).isSuccess, isTrue);
+
+      final keys = <String>{
+        ...roomConfig.toMap().keys,
+        ...roomState.toMap().keys,
+        ...member.toMap().keys,
+      };
+      expect(keys.contains('inviteCode'), isFalse);
+      expect(keys.contains('moderationState'), isFalse);
+      expect(keys.contains('banList'), isFalse);
+      expect(keys.contains('reportCount'), isFalse);
+      expect(keys.contains('discoveryTags'), isFalse);
+      expect(keys.contains('presence'), isFalse);
+      expect(keys.contains('firebasePath'), isFalse);
+      expect(keys.contains('platformUserId'), isFalse);
+    });
+
     test('round result finalScore is backward compatible', () {
       final legacy = RoundResult.tryFromMap(
         <String, dynamic>{

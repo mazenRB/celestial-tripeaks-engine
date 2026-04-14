@@ -1,21 +1,13 @@
 part of 'tripeaks_engine_internal.dart';
 
-/// Multiplayer match mode.
-enum MatchMode {
-  realtime,
-  async,
-}
-
 /// Match lifecycle status.
 enum MatchStatus {
-  waiting,
   active,
   finished,
 }
 
 /// Per-player lifecycle status.
 enum PlayerStatus {
-  joined,
   active,
   finished,
   left,
@@ -50,7 +42,7 @@ final class MatchConfig {
   /// Shared match seed for fair equivalent deals.
   final int matchSeed;
 
-  /// Maximum number of players.
+  /// Maximum number of participating players for this live match.
   final int maxPlayers;
 
   /// Shared session ruleset.

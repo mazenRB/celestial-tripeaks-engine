@@ -95,14 +95,8 @@ ServerResult applyClientEvent(
 
 bool _isClientEventForPlayer(ClientEvent event) {
   switch (event.event) {
-    case JoinMatchEvent(playerId: final id):
-      return id == event.playerId;
-    case LeaveMatchEvent(playerId: final id):
-      return id == event.playerId;
     case SubmitMatchActionEvent(playerId: final id):
       return id == event.playerId;
-    case StartMatchEvent():
-      return true;
   }
 }
 

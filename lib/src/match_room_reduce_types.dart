@@ -2,11 +2,7 @@ part of 'tripeaks_engine_internal.dart';
 
 /// Match reducer failure code.
 enum MatchReduceFailureCode {
-  matchFull,
-  playerAlreadyJoined,
   playerNotFound,
-  matchAlreadyStarted,
-  matchNotStarted,
   matchAlreadyFinished,
   playerNotActive,
 }

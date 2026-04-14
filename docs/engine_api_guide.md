@@ -11,7 +11,7 @@ This guide focuses on practical integration using the package entrypoints.
 - `package:celestial_tripeaks/tripeaks_replay.dart`
   - replay, replay verification, save/load
 - `package:celestial_tripeaks/tripeaks_multiplayer.dart`
-  - match orchestration, match scoring, finalization
+  - room foundation, live match orchestration, match scoring, finalization
 - `package:celestial_tripeaks/tripeaks_authority.dart`
   - authority runtime, reconnect, persistence contracts
 
@@ -51,7 +51,9 @@ This guide focuses on practical integration using the package entrypoints.
 ### Match/Multiplayer
 
 - Import with `tripeaks_engine.dart` for shared config and action types.
-- `MatchConfig`, `MatchState`, `MatchEvent`
+- `RoomConfig`, `RoomState`, `RoomEvent`
+- `MatchBootstrap`, `MatchConfig`, `MatchState`, `MatchEvent`
+- `tryReduceRoom(...)`
 - `tryReduceMatch(...)`
 - `replayMatchEvents(...)`
 - `MatchScoreState` and match-scoring events
@@ -60,7 +62,9 @@ This guide focuses on practical integration using the package entrypoints.
 
 - `round`: one playable TriPeaks board.
 - `session`: a sequence of rounds for one player under one ruleset.
-- `match`: multiplayer orchestration around one or more player sessions.
+- `room`: deterministic pre-match coordination that can bootstrap one live
+  match at a time.
+- `match`: live multiplayer gameplay state around one or more player sessions.
 - `waste`: the primary playable pile used by normal draw and tableau-removal
   flow.
 - `bonus slots`: optional additional playable piles. Internally, slot `1`
@@ -206,8 +210,10 @@ reuse the resolved bundle configs.
 
 ### 5) Authority Host Runtime
 
+- Bootstrap a live `MatchState` from `RoomState` when you need deterministic
+  membership, host ownership, and start validation.
 - Construct `AuthorityRuntime` with `AuthorityStorePort` implementation and
-  baseline `MatchState` (sequence must start at `0`).
+  the bootstrapped baseline `MatchState` (sequence must start at `0`).
 - Call `restore(matchId)` at startup.
 - For each client event, call `apply(...)` with trusted
   `AuthorityRequestContext`.
@@ -244,6 +250,8 @@ Primary map/json contracts:
 - `...toMap()` on state/action/config payloads.
 - `tryFromMap(...)` decode paths that return typed decode failures.
 - Save helpers in `lib/src/save.dart` for round/session/replay envelopes.
+- Room payloads and room bootstrap payloads follow the same
+  `schemaVersion`/`type` rules.
 
 Detailed policy: `/docs/serialization_and_versioning.md`.
 
@@ -253,6 +261,8 @@ Detailed policy: `/docs/serialization_and_versioning.md`.
 - Persist payloads exactly as emitted by `toMap()`.
 - Do not mutate envelope fields before persistence or transport.
 - Keep engine version and schema version in logs and diagnostics.
+- Keep room concerns narrow. Social, transport, identity, notification, and
+  backend-specific lobby concerns belong outside the engine.
 
 Bonus-slot helper:
 

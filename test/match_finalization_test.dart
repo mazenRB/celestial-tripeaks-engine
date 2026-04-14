@@ -11,10 +11,10 @@ void main() {
         matchSeed: 1001,
         maxPlayers: 2,
       );
-      var state = MatchState.newMatch(config: config);
-      state = tryReduceMatch(state, const JoinMatchEvent(playerId: 'p1')).state;
-      state = tryReduceMatch(state, const JoinMatchEvent(playerId: 'p2')).state;
-      state = tryReduceMatch(state, const StartMatchEvent()).state;
+      var state = MatchState.newMatch(
+        config: config,
+        playerIds: const <String>['p1', 'p2'],
+      );
       for (var i = 0; i < 3; i++) {
         state = tryReduceMatch(
           state,

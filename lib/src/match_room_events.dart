@@ -11,68 +11,6 @@ sealed class MatchEvent {
   Map<String, dynamic> toMap();
 }
 
-/// Player joins a room.
-final class JoinMatchEvent extends MatchEvent {
-  /// Creates join event.
-  const JoinMatchEvent({required this.playerId});
-
-  /// Joining player id.
-  final String playerId;
-
-  @override
-  String get eventType => 'join';
-
-  @override
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'schemaVersion': _serializationSchemaV1,
-      'type': 'match_event',
-      'eventType': eventType,
-      'playerId': playerId,
-    };
-  }
-}
-
-/// Player leaves a room.
-final class LeaveMatchEvent extends MatchEvent {
-  /// Creates leave event.
-  const LeaveMatchEvent({required this.playerId});
-
-  /// Leaving player id.
-  final String playerId;
-
-  @override
-  String get eventType => 'leave';
-
-  @override
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'schemaVersion': _serializationSchemaV1,
-      'type': 'match_event',
-      'eventType': eventType,
-      'playerId': playerId,
-    };
-  }
-}
-
-/// Starts a waiting match.
-final class StartMatchEvent extends MatchEvent {
-  /// Creates start event.
-  const StartMatchEvent();
-
-  @override
-  String get eventType => 'start';
-
-  @override
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'schemaVersion': _serializationSchemaV1,
-      'type': 'match_event',
-      'eventType': eventType,
-    };
-  }
-}
-
 /// Submits one action attempt for one player.
 final class SubmitMatchActionEvent extends MatchEvent {
   /// Creates submit action event.
@@ -137,33 +75,6 @@ DecodeResult<MatchEvent> tryDecodeMatchEvent(Map<String, dynamic> map) {
   }
 
   switch (eventType) {
-    case 'join':
-      final playerId = map['playerId'];
-      if (playerId is! String) {
-        return const DecodeResult.failure(
-          DecodeFailure(
-            code: DecodeFailureCode.invalidPayload,
-            message: 'join requires string playerId.',
-          ),
-        );
-      }
-      return DecodeResult.success(JoinMatchEvent(playerId: playerId));
-
-    case 'leave':
-      final playerId = map['playerId'];
-      if (playerId is! String) {
-        return const DecodeResult.failure(
-          DecodeFailure(
-            code: DecodeFailureCode.invalidPayload,
-            message: 'leave requires string playerId.',
-          ),
-        );
-      }
-      return DecodeResult.success(LeaveMatchEvent(playerId: playerId));
-
-    case 'start':
-      return const DecodeResult.success(StartMatchEvent());
-
     case 'submit_action':
       final playerId = map['playerId'];
       final actionMap = map['action'];

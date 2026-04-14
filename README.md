@@ -44,7 +44,8 @@ Use the package entrypoint that matches the layer you need:
 - Stable state/session/replay fingerprints
 - Save/load envelopes with fingerprint integrity validation
 - Deal policy with optional solvable-deal requirement
-- Multiplayer room/match orchestration and server-authority layer
+- Minimal deterministic room foundation and live match orchestration
+- Server-authority layer for bootstrapped live matches
 - Match finalization + competitive scoring policy
 
 ## Quick Start (Beginner)
@@ -139,23 +140,53 @@ import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
 import 'package:celestial_tripeaks/tripeaks_authority.dart';
 
 void main() {
-  final match = MatchState.newMatch(
-    config: MatchConfig(
+  var room = RoomState.newRoom(
+    config: const RoomConfig(
+      roomId: 'room-1',
       matchMode: MatchMode.realtime,
-      matchId: 'match-1',
-      matchSeed: 42,
-      maxPlayers: 2,
+      minMembers: 2,
+      maxMembers: 2,
     ),
   );
+  room = tryReduceRoom(room, const JoinRoomEvent(memberId: 'p1')).state;
+  room = tryReduceRoom(room, const JoinRoomEvent(memberId: 'p2')).state;
+
+  final bootstrap = tryReduceRoom(
+    room,
+    const StartRoomMatchEvent(
+      requestedByMemberId: 'p1',
+      matchId: 'match-1',
+      matchSeed: 42,
+    ),
+  ).bootstrap!;
 
   final runtime = AuthorityRuntime(
     store: InMemoryAuthorityStore(),
-    initialMatchState: match,
+    initialMatchState: bootstrap.matchState,
   );
 
   print(runtime);
 }
 ```
+
+## Room Scope
+
+The engine room layer is intentionally small. It owns only:
+
+- deterministic membership
+- deterministic host selection and transfer
+- deterministic start validation
+- canonical room-to-match bootstrap
+
+It does not own:
+
+- invites, moderation, bans, reporting
+- room discovery or listing metadata
+- presence / online-offline tracking
+- reconnection transport state
+- notifications
+- platform identity concerns
+- Firebase-specific fields or document schemas
 
 ## Determinism Contract
 

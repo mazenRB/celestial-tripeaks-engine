@@ -27,7 +27,7 @@ bool canFinalize(
         return false;
       }
       if (!config.allowAbortFinish) {
-        return players.every((player) => player.status != PlayerStatus.joined);
+        return players.every((player) => player.status != PlayerStatus.active);
       }
       return true;
 
@@ -121,7 +121,6 @@ MatchPlayerOutcome _resolvePlayerOutcome(MatchPlayerState player) {
         return MatchPlayerOutcome.aborted;
       }
       return MatchPlayerOutcome.finished;
-    case PlayerStatus.joined:
     case PlayerStatus.active:
       return MatchPlayerOutcome.disqualified;
   }

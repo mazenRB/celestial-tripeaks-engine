@@ -45,22 +45,35 @@ void main() {
       expect(replayFingerprint(recorded.replay), isNotEmpty);
     });
 
-    test('multiplayer entrypoint supports match setup', () {
-      final match = MatchState.newMatch(
-        config: const MatchConfig(
+    test('multiplayer entrypoint supports room bootstrap', () {
+      var room = RoomState.newRoom(
+        config: const RoomConfig(
+          roomId: 'room-1',
           matchMode: MatchMode.realtime,
-          matchId: 'match-1',
-          matchSeed: 7,
-          maxPlayers: 2,
+          minMembers: 2,
+          maxMembers: 2,
         ),
       );
-      final joined = tryReduceMatch(
-        match,
-        const JoinMatchEvent(playerId: 'p1'),
+      room = tryReduceRoom(
+        room,
+        const JoinRoomEvent(memberId: 'p1'),
+      ).state;
+      room = tryReduceRoom(
+        room,
+        const JoinRoomEvent(memberId: 'p2'),
+      ).state;
+      final started = tryReduceRoom(
+        room,
+        const StartRoomMatchEvent(
+          requestedByMemberId: 'p1',
+          matchId: 'match-1',
+          matchSeed: 7,
+        ),
       );
 
-      expect(joined.isSuccess, isTrue);
-      expect(joined.state.players.single.playerId, 'p1');
+      expect(started.isSuccess, isTrue);
+      expect(started.bootstrap, isNotNull);
+      expect(started.bootstrap!.matchState.players.length, 2);
     });
 
     test('authority entrypoint supports runtime construction', () {
@@ -73,6 +86,7 @@ void main() {
             matchSeed: 9,
             maxPlayers: 2,
           ),
+          playerIds: const <String>['p1', 'p2'],
         ),
       );
 

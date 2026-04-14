@@ -12,7 +12,7 @@ Public package layers:
 
 - `tripeaks_engine.dart` for mechanics, sessions, presets, and helpers
 - `tripeaks_replay.dart` for replay/save flows
-- `tripeaks_multiplayer.dart` for match orchestration
+- `tripeaks_multiplayer.dart` for room foundation and live match orchestration
 - `tripeaks_authority.dart` for host/runtime authority flows
 
 ## Layering Boundaries
@@ -22,7 +22,8 @@ Public package layers:
 - Round mechanics and reducers.
 - Session progression reducers.
 - Match-scoring reducers.
-- Match room reducer/event processing.
+- Room foundation reducer/event processing.
+- Live match reducer/event processing.
 
 Core properties:
 
@@ -38,6 +39,7 @@ Primary files:
 - `lib/src/session_reducer.dart`
 - `lib/src/match_scoring_types.dart`
 - `lib/src/match_scoring_reducer.dart`
+- `lib/src/room.dart`
 - `lib/src/match_room.dart`
 
 ### 2) Orchestration Layer
@@ -102,6 +104,9 @@ The engine expects the following to hold:
   - `AuthorityRuntimeConfig`
 - Add orchestration logic by composing around existing reducer contracts,
   not by adding host/IO behavior into core reducer files.
+- Keep room scope narrow: deterministic bootstrap only, never lobby product
+  concerns such as invites, moderation, discovery, presence, notifications,
+  transport, or backend-specific schemas.
 
 ## Anti-Patterns
 

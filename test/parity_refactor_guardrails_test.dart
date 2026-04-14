@@ -89,17 +89,18 @@ void main() {
         maxPlayers: 2,
       );
       final events = <MatchEvent>[
-        const JoinMatchEvent(playerId: 'p1'),
-        const JoinMatchEvent(playerId: 'p2'),
-        const StartMatchEvent(),
         const SubmitMatchActionEvent(
           playerId: 'p1',
           action: PlayRoundAction(DrawFromStockAction()),
         ),
       ];
 
-      final a = replayMatchEvents(MatchState.newMatch(config: config), events);
-      final b = replayMatchEvents(MatchState.newMatch(config: config), events);
+      final initial = MatchState.newMatch(
+        config: config,
+        playerIds: const <String>['p1', 'p2'],
+      );
+      final a = replayMatchEvents(initial, events);
+      final b = replayMatchEvents(initial, events);
       expect(a.toMap(), b.toMap());
       expect(a.authoritativeSequence, b.authoritativeSequence);
     });

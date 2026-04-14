@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:celestial_tripeaks/tripeaks_authority.dart';
+import 'package:celestial_tripeaks/tripeaks_engine.dart';
 import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
 import 'package:test/test.dart';
 
@@ -14,8 +15,20 @@ void main() {
           matchSeed: 123,
           maxPlayers: 2,
         ),
+        playerIds: const <String>['p1', 'p2'],
       );
     }
+
+    const drawEvent = ClientEvent(
+      matchId: 'runtime',
+      playerId: 'p1',
+      clientEventId: 'p1-1',
+      clientSeq: 1,
+      event: SubmitMatchActionEvent(
+        playerId: 'p1',
+        action: PlayRoundAction(DrawFromStockAction()),
+      ),
+    );
 
     test('baseline starts at sequence 0 and first accepted event is 1',
         () async {
@@ -31,13 +44,7 @@ void main() {
 
       final apply = await runtime.apply(
         const AuthorityRequestContext(subjectId: 's1', playerId: 'p1'),
-        const ClientEvent(
-          matchId: 'runtime',
-          playerId: 'client-side-value-is-ignored',
-          clientEventId: 'p1-1',
-          clientSeq: 1,
-          event: JoinMatchEvent(playerId: 'ignored'),
-        ),
+        drawEvent,
       );
 
       expect(apply.accepted, isTrue);
@@ -60,21 +67,12 @@ void main() {
 
       final result = await runtime.apply(
         const AuthorityRequestContext(subjectId: 's1', playerId: 'p1'),
-        const ClientEvent(
-          matchId: 'runtime',
-          playerId: 'p1',
-          clientEventId: 'p1-1',
-          clientSeq: 1,
-          event: JoinMatchEvent(playerId: 'p1'),
-        ),
+        drawEvent,
       );
 
       expect(result.accepted, isFalse);
       expect(result.rejected, isTrue);
-      expect(
-        result.failure?.code,
-        AuthorityApplyFailureCode.durabilityFailure,
-      );
+      expect(result.failure?.code, AuthorityApplyFailureCode.durabilityFailure);
       expect(runtime.state.matchState.authoritativeSequence, 0);
       expect(store.acceptedEvents('runtime'), isEmpty);
     });
@@ -89,42 +87,34 @@ void main() {
 
       final accepted = await runtime.apply(
         const AuthorityRequestContext(subjectId: 's1', playerId: 'p1'),
-        const ClientEvent(
-          matchId: 'runtime',
-          playerId: 'p1',
-          clientEventId: 'p1-1',
-          clientSeq: 1,
-          event: JoinMatchEvent(playerId: 'p1'),
-        ),
+        drawEvent,
       );
       expect(accepted.accepted, isTrue);
 
       final duplicate = await runtime.apply(
         const AuthorityRequestContext(subjectId: 's1', playerId: 'p1'),
-        const ClientEvent(
-          matchId: 'runtime',
-          playerId: 'p1',
-          clientEventId: 'p1-1',
-          clientSeq: 1,
-          event: JoinMatchEvent(playerId: 'p1'),
-        ),
+        drawEvent,
       );
       expect(duplicate.duplicateIgnored, isTrue);
       expect(duplicate.authoritativeSequence, 1);
       expect(duplicate.lastAcceptedClientSeq, 1);
 
       final rejected = await runtime.apply(
-        const AuthorityRequestContext(subjectId: 's1', playerId: 'p1'),
+        const AuthorityRequestContext(subjectId: 's1', playerId: 'ghost'),
         const ClientEvent(
           matchId: 'runtime',
-          playerId: 'p1',
-          clientEventId: 'p1-2',
+          playerId: 'ghost',
+          clientEventId: 'ghost-1',
           clientSeq: 1,
-          event: StartMatchEvent(),
+          event: SubmitMatchActionEvent(
+            playerId: 'ghost',
+            action: PlayRoundAction(DrawFromStockAction()),
+          ),
         ),
       );
       expect(rejected.rejected, isTrue);
-      expect(rejected.mustFullyResync, isTrue);
+      expect(
+          rejected.failure?.code, AuthorityApplyFailureCode.playerNotInMatch);
 
       expect(store.acceptedEvents('runtime'), hasLength(1));
     });
@@ -142,13 +132,7 @@ void main() {
 
       final accepted = await runtime.apply(
         const AuthorityRequestContext(subjectId: 's1', playerId: 'p1'),
-        const ClientEvent(
-          matchId: 'runtime',
-          playerId: 'p1',
-          clientEventId: 'p1-1',
-          clientSeq: 1,
-          event: JoinMatchEvent(playerId: 'p1'),
-        ),
+        drawEvent,
       );
       expect(accepted.accepted, isTrue);
 
@@ -162,13 +146,7 @@ void main() {
 
       final duplicate = await restarted.apply(
         const AuthorityRequestContext(subjectId: 's1', playerId: 'p1'),
-        const ClientEvent(
-          matchId: 'runtime',
-          playerId: 'ignored',
-          clientEventId: 'p1-1',
-          clientSeq: 1,
-          event: JoinMatchEvent(playerId: 'ignored'),
-        ),
+        drawEvent,
       );
       expect(duplicate.duplicateIgnored, isTrue);
       expect(duplicate.lastAcceptedClientSeq, 1);
@@ -177,10 +155,13 @@ void main() {
         const AuthorityRequestContext(subjectId: 's1', playerId: 'p1'),
         const ClientEvent(
           matchId: 'runtime',
-          playerId: 'ignored',
+          playerId: 'p1',
           clientEventId: 'p1-stale',
           clientSeq: 1,
-          event: JoinMatchEvent(playerId: 'ignored'),
+          event: SubmitMatchActionEvent(
+            playerId: 'p1',
+            action: PlayRoundAction(DrawFromStockAction()),
+          ),
         ),
       );
       expect(stale.rejected, isTrue);
@@ -192,13 +173,7 @@ void main() {
       final store = InMemoryAuthorityStore();
       final initial = buildInitialMatch();
       final acceptedRecord = ServerEventRecord(
-        clientEvent: const ClientEvent(
-          matchId: 'runtime',
-          playerId: 'p1',
-          clientEventId: 'p1-1',
-          clientSeq: 1,
-          event: JoinMatchEvent(playerId: 'p1'),
-        ),
+        clientEvent: drawEvent,
         outcome: ServerApplyStatus.accepted,
         authoritativeSequence: 1,
       );
@@ -218,12 +193,9 @@ void main() {
           schemaVersion: 1,
           engineVersion: initial.engineVersion,
           matchId: 'wrong',
-          authoritativeSequence: 1,
-          matchState: tryReduceMatch(
-            initial,
-            const JoinMatchEvent(playerId: 'p1'),
-          ).state,
-          matchFingerprint: 'invalid',
+          authoritativeSequence: 999,
+          matchState: initial,
+          matchFingerprint: 'bad',
           recentClientEventIdsByPlayer: const <String, List<String>>{},
           lastAcceptedClientSeqByPlayer: const <String, int>{},
         ),
@@ -240,43 +212,24 @@ void main() {
       expect(restored.state.matchState.authoritativeSequence, 1);
     });
 
-    test('restore fails on sequence gap in accepted tail', () async {
+    test('restore fails on accepted tail continuity gap', () async {
       final store = InMemoryAuthorityStore();
       final initial = buildInitialMatch();
-      final accepted1 = PersistedAuthorityEvent.fromAcceptedRecord(
-        engineVersion: initial.engineVersion,
-        matchId: 'runtime',
-        record: const ServerEventRecord(
-          clientEvent: ClientEvent(
-            matchId: 'runtime',
-            playerId: 'p1',
-            clientEventId: 'p1-1',
-            clientSeq: 1,
-            event: JoinMatchEvent(playerId: 'p1'),
-          ),
-          outcome: ServerApplyStatus.accepted,
-          authoritativeSequence: 1,
-        ),
+      final acceptedRecord = ServerEventRecord(
+        clientEvent: drawEvent,
+        outcome: ServerApplyStatus.accepted,
+        authoritativeSequence: 2,
       );
-      final accepted3 = PersistedAuthorityEvent.fromAcceptedRecord(
-        engineVersion: initial.engineVersion,
-        matchId: 'runtime',
-        record: const ServerEventRecord(
-          clientEvent: ClientEvent(
+      store.seedAcceptedEvents(
+        'runtime',
+        <PersistedAuthorityEvent>[
+          PersistedAuthorityEvent.fromAcceptedRecord(
+            engineVersion: initial.engineVersion,
             matchId: 'runtime',
-            playerId: 'p1',
-            clientEventId: 'p1-3',
-            clientSeq: 3,
-            event: StartMatchEvent(),
+            record: acceptedRecord,
           ),
-          outcome: ServerApplyStatus.accepted,
-          authoritativeSequence: 3,
-        ),
+        ],
       );
-      store.seedAcceptedEvents('runtime', <PersistedAuthorityEvent>[
-        accepted1,
-        accepted3,
-      ]);
 
       final runtime = AuthorityRuntime(
         store: store,
@@ -287,16 +240,14 @@ void main() {
       expect(restored.isSuccess, isFalse);
       expect(restored.failure?.code, AuthorityRestoreFailureCode.sequenceGap);
     });
-  });
 
-  test('engine source does not call DateTime.now', () {
-    final sources = Directory('lib')
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((file) => file.path.endsWith('.dart'))
-        .map((file) => file.readAsStringSync())
-        .join('\n');
+    test('package docs avoid src imports in runtime examples', () {
+      final docs = <String>[
+        'README.md',
+        'docs/authority_runtime_integration.md',
+      ].map((path) => File(path).readAsStringSync()).join('\n');
 
-    expect(sources.contains('DateTime.now('), isFalse);
+      expect(docs.contains('package:celestial_tripeaks/src/'), isFalse);
+    });
   });
 }

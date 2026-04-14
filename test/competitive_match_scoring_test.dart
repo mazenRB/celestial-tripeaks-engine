@@ -16,11 +16,10 @@ void main() {
         scoreConfig: scoreConfig,
         dealPolicyConfig: const DealPolicyConfig(mode: DealPolicyMode.random),
       );
-      var state = MatchState.newMatch(config: config);
-      state = tryReduceMatch(state, const JoinMatchEvent(playerId: 'p1')).state;
-      state = tryReduceMatch(state, const JoinMatchEvent(playerId: 'p2')).state;
-      state = tryReduceMatch(state, const StartMatchEvent()).state;
-      return state;
+      return MatchState.newMatch(
+        config: config,
+        playerIds: const <String>['p1', 'p2'],
+      );
     }
 
     test('first finisher receives configured firstFinishBonus', () {

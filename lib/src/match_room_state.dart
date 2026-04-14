@@ -13,15 +13,70 @@ final class MatchState {
     this.finalResult,
   });
 
-  /// Creates initial waiting match state.
-  factory MatchState.newMatch({required MatchConfig config}) {
+  /// Creates initial live match state from a fixed player roster.
+  factory MatchState.newMatch({
+    required MatchConfig config,
+    required List<String> playerIds,
+  }) {
+    final players = <MatchPlayerState>[];
+    for (final playerId in playerIds) {
+      final deal = newGameWithDealPolicy(
+        config.matchSeed,
+        scoreConfig: config.scoreConfig,
+        roundRulesConfig: config.roundRulesConfig,
+        roundTimerConfig: config.roundTimerConfig,
+        undoConfig: config.undoConfig,
+        streakConfig: config.streakConfig,
+        strikeTimerConfig: config.strikeTimerConfig,
+        bonusSlotsConfig: config.bonusSlotsConfig,
+        dealPolicy: config.dealPolicyConfig,
+      );
+      if (!deal.isSuccess || deal.state == null) {
+        throw StateError('Unable to create deterministic live match deal.');
+      }
+
+      final round = deal.state!;
+      final session = TriPeaksSessionState.newSession(
+        ruleset: config.ruleset,
+        seed: deal.attemptSeed,
+        scoreConfig: config.scoreConfig,
+        roundRulesConfig: config.roundRulesConfig,
+        roundTimerConfig: config.roundTimerConfig,
+        undoConfig: config.undoConfig,
+        streakConfig: config.streakConfig,
+        strikeTimerConfig: config.strikeTimerConfig,
+        bonusSlotsConfig: config.bonusSlotsConfig,
+      );
+      final initialized = session._copyWith(currentRound: round);
+      final replay = ReplaySession.newSession(
+        seed: session.seed ?? TriPeaksSessionState.defaultSeed,
+        ruleset: session.ruleset,
+        scoreConfig: session.scoreConfig,
+        roundRulesConfig: session.roundRulesConfig,
+        roundTimerConfig: session.roundTimerConfig,
+        undoConfig: session.undoConfig,
+        streakConfig: session.streakConfig,
+        strikeTimerConfig: session.strikeTimerConfig,
+        bonusSlotsConfig: session.bonusSlotsConfig,
+      );
+      players.add(
+        MatchPlayerState(
+          playerId: playerId,
+          status: PlayerStatus.active,
+          session: initialized,
+          replay: replay,
+          latestFingerprint: sessionFingerprint(initialized),
+        ),
+      );
+    }
+
     return MatchState(
       schemaVersion: _serializationSchemaV1,
       engineVersion: config.engineVersion,
       config: config,
-      matchStatus: MatchStatus.waiting,
+      matchStatus: MatchStatus.active,
       authoritativeSequence: 0,
-      players: const <MatchPlayerState>[],
+      players: List<MatchPlayerState>.unmodifiable(players),
       finalResult: null,
     );
   }
@@ -41,7 +96,7 @@ final class MatchState {
   /// Authoritative total ordering sequence.
   final int authoritativeSequence;
 
-  /// Player states in deterministic join order.
+  /// Player states in deterministic participation order.
   final List<MatchPlayerState> players;
 
   /// Immutable final match result once finalized.

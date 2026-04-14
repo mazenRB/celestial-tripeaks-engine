@@ -18,6 +18,11 @@ Last updated: 2026-02-21
   - Audience: Engine integrators
   - Purpose: core types, reducer usage, integration recipes
 
+- `room_foundation.md`
+  - Audience: Engine integrators, backend/platform engineers
+  - Purpose: room scope, deterministic room lifecycle, and canonical
+    room-to-match bootstrap
+
 - `serialization_and_versioning.md`
   - Audience: Engine integrators, platform/backend engineers
   - Purpose: envelope contracts, schema and engine version policy

@@ -1,6 +1,6 @@
 part of 'tripeaks_engine_internal.dart';
 
-/// Per-player state inside a match.
+/// Per-player live state inside a match.
 final class MatchPlayerState {
   /// Creates player match state.
   const MatchPlayerState({

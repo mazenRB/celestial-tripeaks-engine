@@ -367,11 +367,7 @@ final class AuthorityRuntime {
       (player) => player.playerId == event.playerId,
     );
     switch (event.event) {
-      case JoinMatchEvent():
-        return null;
-      case LeaveMatchEvent():
       case SubmitMatchActionEvent():
-      case StartMatchEvent():
         if (!hasPlayer) {
           return const AuthorityApplyFailure(
             code: AuthorityApplyFailureCode.playerNotInMatch,
@@ -389,10 +385,6 @@ final class AuthorityRuntime {
   }) {
     MatchEvent event;
     switch (original.event) {
-      case JoinMatchEvent():
-        event = JoinMatchEvent(playerId: resolvedPlayerId);
-      case LeaveMatchEvent():
-        event = LeaveMatchEvent(playerId: resolvedPlayerId);
       case SubmitMatchActionEvent(
           action: final action,
           clientSeq: final actionClientSeq,
@@ -402,8 +394,6 @@ final class AuthorityRuntime {
           action: action,
           clientSeq: actionClientSeq,
         );
-      case StartMatchEvent():
-        event = const StartMatchEvent();
     }
 
     return DecodeResult.success(

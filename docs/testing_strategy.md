@@ -52,7 +52,8 @@ dart test
 
 ### Match and Match Scoring
 
-- Join/start/submit/leave flow constraints.
+- Room host transfer, room start validation, and room bootstrap determinism.
+- Live match submit flow constraints.
 - Scoring event application and ordering.
 - First-finish uniqueness behavior.
 
@@ -71,6 +72,7 @@ For each public contract change, add tests for:
 - decode success for current version
 - decode failure for unsupported version
 - invariants tied to sequence/fingerprint integrity
+- excluded room fields staying excluded from public payloads
 
 ## CI Expectations
 

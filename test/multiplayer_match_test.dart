@@ -10,24 +10,18 @@ void main() {
         matchMode: MatchMode.realtime,
         matchId: 'm1',
         matchSeed: 12345,
-        maxPlayers: 4,
+        maxPlayers: 2,
         ruleset: TriPeaksRuleset.threeRounds,
         dealPolicyConfig: const DealPolicyConfig(mode: DealPolicyMode.random),
       );
-      return MatchState.newMatch(config: config);
+      return MatchState.newMatch(
+        config: config,
+        playerIds: const <String>['p1', 'p2'],
+      );
     }
 
     test('players get identical initial deals with same matchSeed', () {
-      var match = buildInitialMatch();
-      match = tryReduceMatch(
-        match,
-        const JoinMatchEvent(playerId: 'p1'),
-      ).state;
-      match = tryReduceMatch(
-        match,
-        const JoinMatchEvent(playerId: 'p2'),
-      ).state;
-      match = tryReduceMatch(match, const StartMatchEvent()).state;
+      final match = buildInitialMatch();
 
       final p1 = match.players.firstWhere((player) => player.playerId == 'p1');
       final p2 = match.players.firstWhere((player) => player.playerId == 'p2');
@@ -45,10 +39,7 @@ void main() {
     });
 
     test('submit action affects only submitting player state and replay', () {
-      var match = buildInitialMatch();
-      match = tryReduceMatch(match, const JoinMatchEvent(playerId: 'p1')).state;
-      match = tryReduceMatch(match, const JoinMatchEvent(playerId: 'p2')).state;
-      match = tryReduceMatch(match, const StartMatchEvent()).state;
+      final match = buildInitialMatch();
 
       final beforeP1 =
           match.players.firstWhere((player) => player.playerId == 'p1');
@@ -90,9 +81,10 @@ void main() {
         maxPlayers: 2,
         undoConfig: const UndoConfig(enabled: false),
       );
-      var match = MatchState.newMatch(config: config);
-      match = tryReduceMatch(match, const JoinMatchEvent(playerId: 'p1')).state;
-      match = tryReduceMatch(match, const StartMatchEvent()).state;
+      final match = MatchState.newMatch(
+        config: config,
+        playerIds: const <String>['p1'],
+      );
 
       final before = match.players.single;
       final reduced = tryReduceMatch(
@@ -123,9 +115,6 @@ void main() {
 
     test('finish order is deterministic and follows event ordering', () {
       var match = buildInitialMatch();
-      match = tryReduceMatch(match, const JoinMatchEvent(playerId: 'p1')).state;
-      match = tryReduceMatch(match, const JoinMatchEvent(playerId: 'p2')).state;
-      match = tryReduceMatch(match, const StartMatchEvent()).state;
 
       for (var i = 0; i < 3; i++) {
         match = tryReduceMatch(
@@ -158,9 +147,6 @@ void main() {
         () {
       final initial = buildInitialMatch();
       final events = <MatchEvent>[
-        const JoinMatchEvent(playerId: 'p1'),
-        const JoinMatchEvent(playerId: 'p2'),
-        const StartMatchEvent(),
         const SubmitMatchActionEvent(
           playerId: 'p1',
           action: PlayRoundAction(DrawFromStockAction()),
