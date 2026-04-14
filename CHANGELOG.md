@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2026-04-14
+
 ### Added
 
 - Minimal deterministic room foundation under `tripeaks_multiplayer.dart`:
