@@ -1,5 +1,5 @@
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 
 List<Card> buildDeck({
   required Map<int, Card> tableauOverrides,
@@ -169,13 +169,13 @@ TriPeaksState applyTryActions(
   return state;
 }
 
-MatchScoreState applyMatchEvents(
-  MatchScoreState initial,
-  List<MatchScoreEvent> events,
+CompetitionScoreState applyCompetitionEvents(
+  CompetitionScoreState initial,
+  List<CompetitionScoreEvent> events,
 ) {
   var state = initial;
   for (final event in events) {
-    state = reduceMatchScore(state, event);
+    state = reduceCompetitionScore(state, event);
   }
   return state;
 }

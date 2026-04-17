@@ -1,5 +1,5 @@
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 import 'package:celestial_tripeaks/tripeaks_replay.dart';
 import 'package:test/test.dart';
 
@@ -81,28 +81,33 @@ void main() {
           live.currentRound.scoreState.toMap());
     });
 
-    test('match reducer and replay are deterministic for same events', () {
-      final config = MatchConfig(
-        matchMode: MatchMode.realtime,
-        matchId: 'parity',
-        matchSeed: 77,
-        maxPlayers: 2,
+    test('completed-run helper comparison is deterministic', () {
+      final baseline = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        seed: 77,
       );
-      final events = <MatchEvent>[
-        const SubmitMatchActionEvent(
-          playerId: 'p1',
-          action: PlayRoundAction(DrawFromStockAction()),
-        ),
-      ];
+      final improved = tryReduceTriPeaksSession(
+        baseline,
+        const PlayRoundAction(DrawFromStockAction()),
+      ).state;
 
-      final initial = MatchState.newMatch(
-        config: config,
-        playerIds: const <String>['p1', 'p2'],
+      final a = compareCompletedRuns(
+        <String, CompletedSessionResult>{
+          'p1': CompletedSessionResult.fromSession(improved),
+          'p2': CompletedSessionResult.fromSession(baseline),
+        },
       );
-      final a = replayMatchEvents(initial, events);
-      final b = replayMatchEvents(initial, events);
-      expect(a.toMap(), b.toMap());
-      expect(a.authoritativeSequence, b.authoritativeSequence);
+      final b = compareCompletedRuns(
+        <String, CompletedSessionResult>{
+          'p1': CompletedSessionResult.fromSession(improved),
+          'p2': CompletedSessionResult.fromSession(baseline),
+        },
+      );
+
+      expect(
+        a.rankings.map((entry) => entry.entryId).toList(),
+        equals(b.rankings.map((entry) => entry.entryId).toList()),
+      );
     });
   });
 }

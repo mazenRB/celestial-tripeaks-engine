@@ -1,5 +1,5 @@
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 import 'package:celestial_tripeaks/tripeaks_replay.dart';
 import 'package:test/test.dart';
 
@@ -138,7 +138,7 @@ void main() {
       expect(decoded.value!.currentRound.hasActiveRoundTimer, isFalse);
     });
 
-    test('replay and match config round-trip preserve roundTimerConfig', () {
+    test('replay round-trip preserves roundTimerConfig', () {
       const roundTimerConfig = RoundTimerConfig(
         enabled: true,
         durationsSecondsByRound: <int>[5, 0, 7],
@@ -163,92 +163,52 @@ void main() {
         replayDecoded.value!.scoreConfig.resetTimeBonusOnInvalidPenalty,
         isTrue,
       );
-
-      final matchConfig = MatchConfig(
-        matchMode: MatchMode.realtime,
-        matchId: 'match-1',
-        matchSeed: 42,
-        maxPlayers: 2,
-        ruleset: TriPeaksRuleset.threeRounds,
-        scoreConfig: scoreConfig,
-        roundTimerConfig: roundTimerConfig,
-      );
-      final matchDecoded = MatchConfig.tryFromMap(matchConfig.toMap());
-      expect(matchDecoded.isSuccess, isTrue);
-      expect(
-        matchDecoded.value!.roundTimerConfig.durationsSecondsByRound,
-        equals(roundTimerConfig.durationsSecondsByRound),
-      );
-      expect(
-        matchDecoded.value!.scoreConfig.resetTimeBonusOnInvalidPenalty,
-        isTrue,
-      );
     });
 
-    test('room payloads round-trip and exclude lobby product fields', () {
-      final roomConfig = RoomConfig(
-        roomId: 'room-1',
-        matchMode: MatchMode.realtime,
-        minMembers: 2,
-        maxMembers: 4,
-        roundTimerConfig: const RoundTimerConfig(
-          enabled: true,
-          durationsSecondsByRound: <int>[5, 0, 7],
-        ),
+    test('completed session result round-trips and stays engine-agnostic', () {
+      final session = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        seed: 77,
       );
-      final roomState = RoomState.newRoom(config: roomConfig);
-      final member = const RoomMemberState(
-        memberId: 'p1',
-        joinOrder: 1,
-        status: RoomMemberStatus.joined,
-      );
-      final roomEvent = const StartRoomMatchEvent(
-        requestedByMemberId: 'p1',
-        matchId: 'match-1',
-        matchSeed: 77,
-      );
-      final bootstrap = MatchBootstrap(
-        schemaVersion: 1,
-        engineVersion: 1,
-        roomId: 'room-1',
-        matchId: 'match-1',
-        matchOrdinal: 1,
-        matchConfig: const MatchConfig(
-          matchMode: MatchMode.realtime,
-          matchId: 'match-1',
-          matchSeed: 77,
-          maxPlayers: 2,
-        ),
-        matchState: MatchState.newMatch(
-          config: const MatchConfig(
-            matchMode: MatchMode.realtime,
-            matchId: 'match-1',
-            matchSeed: 77,
-            maxPlayers: 2,
-          ),
-          playerIds: const <String>['p1', 'p2'],
-        ),
-      );
+      final result = CompletedSessionResult.fromSession(session);
+      final decoded = CompletedSessionResult.tryFromMap(result.toMap());
 
-      expect(RoomConfig.tryFromMap(roomConfig.toMap()).isSuccess, isTrue);
-      expect(RoomState.tryFromMap(roomState.toMap()).isSuccess, isTrue);
-      expect(RoomMemberState.tryFromMap(member.toMap()).isSuccess, isTrue);
-      expect(tryDecodeRoomEvent(roomEvent.toMap()).isSuccess, isTrue);
-      expect(MatchBootstrap.tryFromMap(bootstrap.toMap()).isSuccess, isTrue);
+      expect(decoded.isSuccess, isTrue);
+      expect(decoded.value!.seed, 77);
+      expect(decoded.value!.finalFingerprint, result.finalFingerprint);
 
-      final keys = <String>{
-        ...roomConfig.toMap().keys,
-        ...roomState.toMap().keys,
-        ...member.toMap().keys,
-      };
-      expect(keys.contains('inviteCode'), isFalse);
-      expect(keys.contains('moderationState'), isFalse);
-      expect(keys.contains('banList'), isFalse);
-      expect(keys.contains('reportCount'), isFalse);
-      expect(keys.contains('discoveryTags'), isFalse);
-      expect(keys.contains('presence'), isFalse);
-      expect(keys.contains('firebasePath'), isFalse);
-      expect(keys.contains('platformUserId'), isFalse);
+      final keys = result.toMap().keys.toSet();
+      expect(keys.contains('roomId'), isFalse);
+      expect(keys.contains('matchId'), isFalse);
+      expect(keys.contains('playerId'), isFalse);
+      expect(keys.contains('authoritativeSequence'), isFalse);
+    });
+
+    test('competition helper score state is deterministic from event replay',
+        () {
+      const initial = CompetitionScoreState(
+        config: CompetitionScoreConfig(
+          completionBonus: 11,
+          placementAdjustments: <int, int>{1: 5, 2: 2},
+        ),
+      );
+      final events = <CompetitionScoreEvent>[
+        const RunScoreRecorded(entryId: 'a', runScore: 9),
+        const RunScoreRecorded(entryId: 'b', runScore: 7),
+        const BonusApplied(entryId: 'a'),
+        const PlacementAdjustmentApplied(entryId: 'a', rank: 1),
+        const PlacementAdjustmentApplied(entryId: 'b', rank: 2),
+      ];
+
+      var stateA = initial;
+      var stateB = initial;
+      for (final event in events) {
+        stateA = reduceCompetitionScore(stateA, event);
+        stateB = reduceCompetitionScore(stateB, event);
+      }
+
+      expect(stateA.totalScoresByEntry, equals(stateB.totalScoresByEntry));
+      expect(stateA.processedEventsCount, stateB.processedEventsCount);
     });
 
     test('round result finalScore is backward compatible', () {

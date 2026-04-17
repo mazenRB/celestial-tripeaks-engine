@@ -1,12 +1,12 @@
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 import 'package:test/test.dart';
 
 import 'test_support.dart';
 
 void main() {
-  group('Match scoring layer', () {
-    test('round score is unaffected by multiplayer bonuses', () {
+  group('Competition score helpers', () {
+    test('round score is unaffected by helper bonuses', () {
       final deck = buildDeck(
         tableauOverrides: <int, Card>{
           18: const Card(Rank.six, Suit.clubs),
@@ -19,71 +19,74 @@ void main() {
       );
       final beforeRoundScore = roundState.scoreState.totalScore;
 
-      var match = MatchScoreState(
-        config: const MatchScoreConfig(firstFinishBonus: 10),
+      var helper = const CompetitionScoreState(
+        config: CompetitionScoreConfig(completionBonus: 10),
       );
-      match = reduceMatchScore(
-        match,
-        RoundScoreAggregated(
-          playerId: 'p1',
-          roundScore: roundState.scoreState.totalScore,
+      helper = reduceCompetitionScore(
+        helper,
+        RunScoreRecorded(
+          entryId: 'p1',
+          runScore: roundState.scoreState.totalScore,
         ),
       );
-      match = reduceMatchScore(
-        match,
-        const FirstFinishBonusApplied(playerId: 'p1'),
+      helper = reduceCompetitionScore(
+        helper,
+        const BonusApplied(entryId: 'p1'),
       );
 
       expect(roundState.scoreState.totalScore, beforeRoundScore);
       expect(roundState.scoreState.totalScore, 5);
-      expect(match.totalFor('p1'), 15);
+      expect(helper.totalFor('p1'), 15);
     });
 
-    test('applies first-finish bonus to match score', () {
-      var match = MatchScoreState(
-        config: const MatchScoreConfig(firstFinishBonus: 12),
+    test('applies completion bonus to helper score', () {
+      var helper = const CompetitionScoreState(
+        config: CompetitionScoreConfig(completionBonus: 12),
       );
 
-      match = reduceMatchScore(
-        match,
-        const RoundScoreAggregated(playerId: 'p1', roundScore: 9),
+      helper = reduceCompetitionScore(
+        helper,
+        const RunScoreRecorded(entryId: 'p1', runScore: 9),
       );
-      match = reduceMatchScore(
-        match,
-        const FirstFinishBonusApplied(playerId: 'p1'),
+      helper = reduceCompetitionScore(
+        helper,
+        const BonusApplied(entryId: 'p1'),
       );
 
-      expect(match.totalFor('p1'), 21);
-      expect(match.firstFinishAwardedTo, 'p1');
+      expect(helper.totalFor('p1'), 21);
+      expect(helper.completionBonusAwardedTo, contains('p1'));
     });
 
     test('determinism: identical event sequence gives identical totals', () {
-      final initialA = MatchScoreState(
-        config: const MatchScoreConfig(
-          firstFinishBonus: 15,
-          rankingAdjustments: <int, int>{1: 7, 2: 2},
+      final initialA = const CompetitionScoreState(
+        config: CompetitionScoreConfig(
+          completionBonus: 15,
+          placementAdjustments: <int, int>{1: 7, 2: 2},
         ),
       );
-      final initialB = MatchScoreState(
-        config: const MatchScoreConfig(
-          firstFinishBonus: 15,
-          rankingAdjustments: <int, int>{1: 7, 2: 2},
+      final initialB = const CompetitionScoreState(
+        config: CompetitionScoreConfig(
+          completionBonus: 15,
+          placementAdjustments: <int, int>{1: 7, 2: 2},
         ),
       );
-      final events = <MatchScoreEvent>[
-        const RoundScoreAggregated(playerId: 'p1', roundScore: 11),
-        const RoundScoreAggregated(playerId: 'p2', roundScore: 8),
-        const FirstFinishBonusApplied(playerId: 'p1'),
-        const RankingAdjustmentApplied(playerId: 'p1', rank: 1),
-        const RankingAdjustmentApplied(playerId: 'p2', rank: 2),
+      final events = <CompetitionScoreEvent>[
+        const RunScoreRecorded(entryId: 'p1', runScore: 11),
+        const RunScoreRecorded(entryId: 'p2', runScore: 8),
+        const BonusApplied(entryId: 'p1'),
+        const PlacementAdjustmentApplied(entryId: 'p1', rank: 1),
+        const PlacementAdjustmentApplied(entryId: 'p2', rank: 2),
       ];
 
-      final finalA = applyMatchEvents(initialA, events);
-      final finalB = applyMatchEvents(initialB, events);
+      final finalA = applyCompetitionEvents(initialA, events);
+      final finalB = applyCompetitionEvents(initialB, events);
 
-      expect(finalA.totalScoresByPlayer, equals(finalB.totalScoresByPlayer));
+      expect(finalA.totalScoresByEntry, equals(finalB.totalScoresByEntry));
       expect(finalA.processedEventsCount, finalB.processedEventsCount);
-      expect(finalA.firstFinishAwardedTo, finalB.firstFinishAwardedTo);
+      expect(
+        finalA.completionBonusAwardedTo,
+        equals(finalB.completionBonusAwardedTo),
+      );
     });
   });
 }

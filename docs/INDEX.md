@@ -1,6 +1,6 @@
 # Documentation Index
 
-Last updated: 2026-02-21
+Last updated: 2026-04-17
 
 ## Start Here
 
@@ -18,28 +18,9 @@ Last updated: 2026-02-21
   - Audience: Engine integrators
   - Purpose: core types, reducer usage, integration recipes
 
-- `room_foundation.md`
-  - Audience: Engine integrators, backend/platform engineers
-  - Purpose: room scope, deterministic room lifecycle, and canonical
-    room-to-match bootstrap
-
 - `serialization_and_versioning.md`
   - Audience: Engine integrators, platform/backend engineers
   - Purpose: envelope contracts, schema and engine version policy
-
-## Multiplayer Authority and Persistence
-
-- `authority_runtime_integration.md`
-  - Audience: Backend/platform engineers
-  - Purpose: runtime lifecycle, apply/restore sequencing, resync behavior
-
-- `authority_runtime_schema.md`
-  - Audience: Backend/platform engineers
-  - Purpose: accepted-event and snapshot durable payload schemas
-
-- `authority_store_adapter_shapes.md`
-  - Audience: Backend/platform engineers
-  - Purpose: storage adapter contract and persistence shape guidance
 
 ## Operations and Tooling
 
@@ -48,7 +29,7 @@ Last updated: 2026-02-21
   - Purpose: command/flag reference for the included CLI harness
 
 - `configuration_tuning_reference.md`
-  - Audience: Integrators, game designers, backend/platform engineers
+  - Audience: Integrators, game designers
   - Purpose: defaults, tuning knobs, and risk notes
 
 - `testing_strategy.md`

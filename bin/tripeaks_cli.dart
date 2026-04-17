@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 import 'package:celestial_tripeaks/tripeaks_replay.dart';
 
 void main(List<String> args) {
@@ -17,7 +17,7 @@ void main(List<String> args) {
     strikeTimerConfig: config.strikeTimerConfig,
     bonusSlotsConfig: config.bonusSlotsConfig,
   );
-  var matchScore = MatchScoreState(config: config.matchScoreConfig);
+  var helperScore = CompetitionScoreState(config: config.helperScoreConfig);
   var replay = TriPeaksReplay.newSession(
     seed: session.seed ?? TriPeaksSessionState.defaultSeed,
     ruleset: session.ruleset,
@@ -477,75 +477,74 @@ void main(List<String> args) {
       continue;
     }
 
-    if (command == 'match') {
+    if (command == 'helper') {
       if (tokens.length < 2) {
         stdout.writeln(
-          'Usage: match <show|commit|bonus|rank|reset> ...',
+          'Usage: helper <show|commit|bonus|rank|reset> ...',
         );
         continue;
       }
       final sub = tokens[1].toLowerCase();
       switch (sub) {
         case 'show':
-          _printMatchScore(matchScore);
+          _printHelperScore(helperScore);
           break;
 
         case 'commit':
           if (tokens.length < 3) {
-            stdout.writeln('Usage: match commit <playerId> [roundScore]');
+            stdout.writeln('Usage: helper commit <entryId> [runScore]');
             break;
           }
-          final playerId = tokens[2];
+          final entryId = tokens[2];
           final roundScore = tokens.length > 3
               ? int.tryParse(tokens[3])
               : session.currentRound.scoreState.totalScore;
           if (roundScore == null) {
-            stdout
-                .writeln('Invalid roundScore. Usage: match commit <id> <int>');
+            stdout.writeln('Invalid runScore. Usage: helper commit <id> <int>');
             break;
           }
-          matchScore = _reduceMatch(
-            matchScore,
-            RoundScoreAggregated(playerId: playerId, roundScore: roundScore),
+          helperScore = _reduceHelperScore(
+            helperScore,
+            RunScoreRecorded(entryId: entryId, runScore: roundScore),
           );
           break;
 
         case 'bonus':
           if (tokens.length < 3) {
-            stdout.writeln('Usage: match bonus <playerId>');
+            stdout.writeln('Usage: helper bonus <entryId>');
             break;
           }
-          matchScore = _reduceMatch(
-            matchScore,
-            FirstFinishBonusApplied(playerId: tokens[2]),
+          helperScore = _reduceHelperScore(
+            helperScore,
+            BonusApplied(entryId: tokens[2]),
           );
           break;
 
         case 'rank':
           if (tokens.length < 4) {
-            stdout.writeln('Usage: match rank <playerId> <rank>');
+            stdout.writeln('Usage: helper rank <entryId> <rank>');
             break;
           }
           final rank = int.tryParse(tokens[3]);
           if (rank == null) {
-            stdout.writeln('Invalid rank. Usage: match rank <playerId> <rank>');
+            stdout.writeln('Invalid rank. Usage: helper rank <entryId> <rank>');
             break;
           }
-          matchScore = _reduceMatch(
-            matchScore,
-            RankingAdjustmentApplied(playerId: tokens[2], rank: rank),
+          helperScore = _reduceHelperScore(
+            helperScore,
+            PlacementAdjustmentApplied(entryId: tokens[2], rank: rank),
           );
           break;
 
         case 'reset':
-          matchScore = MatchScoreState(config: config.matchScoreConfig);
-          stdout.writeln('Match score reset.');
+          helperScore = CompetitionScoreState(config: config.helperScoreConfig);
+          stdout.writeln('Helper score reset.');
           break;
 
         default:
-          stdout.writeln('Unknown match command: $sub');
+          stdout.writeln('Unknown helper command: $sub');
           stdout.writeln(
-            'Use: match show | match commit | match bonus | match rank | match reset',
+            'Use: helper show | helper commit | helper bonus | helper rank | helper reset',
           );
       }
       continue;
@@ -602,16 +601,16 @@ TriPeaksSessionState _handleSessionResult(
   return next;
 }
 
-MatchScoreState _reduceMatch(
-  MatchScoreState current,
-  MatchScoreEvent event,
+CompetitionScoreState _reduceHelperScore(
+  CompetitionScoreState current,
+  CompetitionScoreEvent event,
 ) {
-  final result = tryReduceMatchScore(current, event);
+  final result = tryReduceCompetitionScore(current, event);
   if (!result.isSuccess) {
-    stdout.writeln('Match scoring error: ${result.error!.message}');
+    stdout.writeln('Helper scoring error: ${result.error!.message}');
     return current;
   }
-  _printMatchScore(result.state);
+  _printHelperScore(result.state);
   return result.state;
 }
 
@@ -644,14 +643,13 @@ void _printHelp() {
   stdout.writeln(
       '  next                        Start next round after current ends.');
   stdout.writeln('  new                         Start a new game session.');
-  stdout.writeln('  match show                  Show match scoring state.');
+  stdout.writeln('  helper show                 Show helper scoring state.');
   stdout.writeln(
-      '  match commit <id> [score]   Aggregate round score for player.');
+      '  helper commit <id> [score]  Aggregate run score for one entry.');
+  stdout.writeln('  helper bonus <id>           Apply completion bonus event.');
   stdout
-      .writeln('  match bonus <id>            Apply first-finish bonus event.');
-  stdout
-      .writeln('  match rank <id> <rank>      Apply ranking adjustment event.');
-  stdout.writeln('  match reset                 Reset match scoring.');
+      .writeln('  helper rank <id> <rank>     Apply ranking adjustment event.');
+  stdout.writeln('  helper reset                Reset helper scoring.');
   stdout.writeln('  replay show                Show replay metadata.');
   stdout.writeln('  replay save [file]         Save replay as JSON.');
   stdout
@@ -660,7 +658,7 @@ void _printHelp() {
   stdout.writeln('Aliases:');
   stdout.writeln('  ?:help, s:show, mv:moves, hn:hint, sc:score');
   stdout.writeln('  d:draw, t:take, u:undo, n:next, a:abort, x:expire');
-  stdout.writeln('  rp:replay, mt:match, fp:fingerprint, v:verify, q:quit');
+  stdout.writeln('  rp:replay, hp:helper, fp:fingerprint, v:verify, q:quit');
   stdout.writeln('  (empty line repeats last command)');
   stdout.writeln('Flags:');
   stdout.writeln('  --wrap-ace-king=true|false  Enable/disable A-K wrapping.');
@@ -711,13 +709,16 @@ void _printRoundScore(TriPeaksState state) {
   );
 }
 
-void _printMatchScore(MatchScoreState state) {
-  stdout.writeln('Match scores: ${state.totalScoresByPlayer}');
-  stdout.writeln('  Round totals: ${state.roundScoresByPlayer}');
-  stdout.writeln('  Bonuses: ${state.multiplayerBonusesByPlayer}');
-  stdout.writeln('  Rank adjustments: ${state.competitiveAdjustmentsByPlayer}');
+void _printHelperScore(CompetitionScoreState state) {
+  stdout.writeln('Helper scores: ${state.totalScoresByEntry}');
+  stdout.writeln('  Run totals: ${state.runScoresByEntry}');
+  stdout.writeln('  Bonuses: ${state.bonusesByEntry}');
   stdout.writeln(
-    '  First finish awarded to: ${state.firstFinishAwardedTo ?? '(none)'}',
+    '  Rank adjustments: ${state.placementAdjustmentsByEntry}',
+  );
+  stdout.writeln(
+    '  Completion bonus awarded to: '
+    '${state.completionBonusAwardedTo.isEmpty ? '(none)' : state.completionBonusAwardedTo.join(', ')}',
   );
   stdout.writeln('  Processed events: ${state.processedEventsCount}');
 }
@@ -915,8 +916,8 @@ String _normalizeCommand(String command) {
       return 'expire';
     case 'rp':
       return 'replay';
-    case 'mt':
-      return 'match';
+    case 'hp':
+      return 'helper';
     case 'fp':
       return 'fingerprint';
     case 'v':
@@ -936,7 +937,7 @@ final class _CliConfig {
     required this.streakConfig,
     required this.strikeTimerConfig,
     required this.bonusSlotsConfig,
-    required this.matchScoreConfig,
+    required this.helperScoreConfig,
     this.seed,
   });
 
@@ -948,7 +949,7 @@ final class _CliConfig {
   final StreakConfig streakConfig;
   final StrikeTimerConfig strikeTimerConfig;
   final BonusSlotsConfig bonusSlotsConfig;
-  final MatchScoreConfig matchScoreConfig;
+  final CompetitionScoreConfig helperScoreConfig;
   final int? seed;
 }
 
@@ -974,7 +975,7 @@ _CliConfig _parseArgs(List<String> args) {
   int bonusSlot3Streak = 6;
   bool bonusCloseOnDraw = true;
   bool bonusCloseOnInvalid = true;
-  int firstFinishBonus = 0;
+  int completionBonus = 0;
   Map<int, int> rankingAdjustments = const <int, int>{};
 
   for (final arg in args) {
@@ -983,9 +984,9 @@ _CliConfig _parseArgs(List<String> args) {
       ruleset = _rulesetFromRounds(value);
       continue;
     }
-    if (arg.startsWith('--first-finish-bonus=')) {
-      firstFinishBonus = int.tryParse(
-            arg.substring('--first-finish-bonus='.length),
+    if (arg.startsWith('--completion-bonus=')) {
+      completionBonus = int.tryParse(
+            arg.substring('--completion-bonus='.length),
           ) ??
           0;
       continue;
@@ -1159,9 +1160,9 @@ _CliConfig _parseArgs(List<String> args) {
       closeOnDraw: bonusCloseOnDraw,
       closeOnInvalidAction: bonusCloseOnInvalid,
     ),
-    matchScoreConfig: MatchScoreConfig(
-      firstFinishBonus: firstFinishBonus,
-      rankingAdjustments: rankingAdjustments,
+    helperScoreConfig: CompetitionScoreConfig(
+      completionBonus: completionBonus,
+      placementAdjustments: rankingAdjustments,
     ),
   );
 }

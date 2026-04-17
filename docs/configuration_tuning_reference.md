@@ -270,26 +270,8 @@ Risk notes:
 
 - Large ranking deltas can dominate mechanics-derived scoring.
 
-## Authority Runtime
-
-### `AuthorityRuntimeConfig`
-
-Import from `tripeaks_authority.dart` together with the core and multiplayer
-entrypoints.
-
-Defaults:
-
-- `snapshotEveryAccepted = 100`
-- `processedClientEventIdsCapacityPerPlayer = 1000`
-
-Risk notes:
-
-- Larger snapshot interval increases restore replay duration.
-- Smaller duplicate-ID capacity increases duplicate false negatives.
-
 ## Tuning Guidelines
 
 - Start with defaults and adjust one parameter family at a time.
 - Validate deterministic replay equivalence after config changes.
-- Use integration tests for authority restore/apply behavior under your
-  chosen values.
+- Keep multiplayer orchestration tuning outside this package boundary.

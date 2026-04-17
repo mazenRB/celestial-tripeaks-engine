@@ -1,6 +1,6 @@
 # Engine API Guide
 
-Last updated: 2026-03-27
+Last updated: 2026-04-17
 
 This guide focuses on practical integration using the package entrypoints.
 
@@ -10,10 +10,8 @@ This guide focuses on practical integration using the package entrypoints.
   - core round/session, configs, presets, daily helpers
 - `package:celestial_tripeaks/tripeaks_replay.dart`
   - replay, replay verification, save/load
-- `package:celestial_tripeaks/tripeaks_multiplayer.dart`
-  - room foundation, live match orchestration, match scoring, finalization
-- `package:celestial_tripeaks/tripeaks_authority.dart`
-  - authority runtime, reconnect, persistence contracts
+- `package:celestial_tripeaks/tripeaks_helpers.dart`
+  - neutral completed-run results and helper comparison utilities
 
 ## Core Types You Will Use
 
@@ -48,23 +46,18 @@ This guide focuses on practical integration using the package entrypoints.
 - `recordAction(...)`
 - `replayToState(...)`
 
-### Match/Multiplayer
+### Helpers
 
-- Import with `tripeaks_engine.dart` for shared config and action types.
-- `RoomConfig`, `RoomState`, `RoomEvent`
-- `MatchBootstrap`, `MatchConfig`, `MatchState`, `MatchEvent`
-- `tryReduceRoom(...)`
-- `tryReduceMatch(...)`
-- `replayMatchEvents(...)`
-- `MatchScoreState` and match-scoring events
+- `CompletedSessionResult`
+- `compareCompletedRuns(...)`
+- `CompetitionRankingConfig`
+- `CompetitionScoreState`
+- helper scoring and adjustment events
 
 ## Terminology
 
 - `round`: one playable TriPeaks board.
 - `session`: a sequence of rounds for one player under one ruleset.
-- `room`: deterministic pre-match coordination that can bootstrap one live
-  match at a time.
-- `match`: live multiplayer gameplay state around one or more player sessions.
 - `waste`: the primary playable pile used by normal draw and tableau-removal
   flow.
 - `bonus slots`: optional additional playable piles. Internally, slot `1`
@@ -74,16 +67,6 @@ This guide focuses on practical integration using the package entrypoints.
   streaks, undo, deal policy, and bonus-slot behavior.
 - `TriPeaksModeBundle`: an engine-owned preset bundle that resolves to a full
   set of configs without replacing explicit config APIs.
-
-### Authority Runtime
-
-- Import with `tripeaks_engine.dart` and `tripeaks_multiplayer.dart`.
-- `AuthorityRuntime`
-- `AuthorityRuntimeState`
-- `AuthorityRequestContext`
-- `AuthorityApplyResult`
-- `AuthorityRestoreResult`
-- `AuthorityStorePort`
 
 ## Integration Recipes
 
@@ -170,7 +153,7 @@ Serialized `TriPeaksModeBundle` payloads preserve their nested resolved config
 values as written. Decode treats `presetId` as metadata and does not re-resolve
 current catalog defaults.
 
-`TriPeaksModeBundle` also carries `dealPolicyConfig` for server/match/deal
+`TriPeaksModeBundle` also carries `dealPolicyConfig` for deterministic deal
 generation reuse.
 
 ### 3) Replay Logging
@@ -208,18 +191,22 @@ final session = newDailySessionForPreset(
 Preset-backed daily helpers derive `modeId` from the engine-owned preset id and
 reuse the resolved bundle configs.
 
-### 5) Authority Host Runtime
+### 5) Completed-Run Helpers
 
-- Bootstrap a live `MatchState` from `RoomState` when you need deterministic
-  membership, host ownership, and start validation.
-- Construct `AuthorityRuntime` with `AuthorityStorePort` implementation and
-  the bootstrapped baseline `MatchState` (sequence must start at `0`).
-- Call `restore(matchId)` at startup.
-- For each client event, call `apply(...)` with trusted
-  `AuthorityRequestContext`.
-- Persisted event append is runtime-managed through the store port.
+```dart
+import 'package:celestial_tripeaks/tripeaks_engine.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 
-See `/docs/authority_runtime_integration.md`.
+final session = TriPeaksSessionState.newSession(
+  ruleset: TriPeaksRuleset.threeRounds,
+  seed: 42,
+);
+
+final result = CompletedSessionResult.fromSession(session);
+final comparison = compareCompletedRuns(
+  <String, CompletedSessionResult>{'entry-a': result},
+);
+```
 
 ## Error and Result Contracts
 
@@ -227,10 +214,6 @@ Use non-throwing APIs in host/integration boundaries:
 
 - `TriPeaksReduceResult`
 - `TriPeaksSessionReduceResult`
-- `MatchReduceResult`
-- `MatchScoreReduceResult`
-- `AuthorityApplyResult`
-- `AuthorityRestoreResult`
 
 They carry typed failure payloads suitable for telemetry and protocol mapping.
 
@@ -250,8 +233,7 @@ Primary map/json contracts:
 - `...toMap()` on state/action/config payloads.
 - `tryFromMap(...)` decode paths that return typed decode failures.
 - Save helpers in `lib/src/save.dart` for round/session/replay envelopes.
-- Room payloads and room bootstrap payloads follow the same
-  `schemaVersion`/`type` rules.
+- Helper payloads follow the same `schemaVersion`/`type` rules.
 
 Detailed policy: `/docs/serialization_and_versioning.md`.
 

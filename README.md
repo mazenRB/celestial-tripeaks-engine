@@ -1,86 +1,42 @@
 # Celestial TriPeaks (Pure Dart Engine)
 
-A deterministic, pure Dart Solitaire TriPeaks engine (no Flutter imports).
+A deterministic, pure Dart Solitaire TriPeaks engine with replay and validation
+support.
 
-This project is designed so you can:
-- build mobile/web/desktop/server apps on top of the same rules engine
-- replay and verify games deterministically
-- save/load safely with integrity checks
-- support single-player and multiplayer orchestration layers
+This package is intentionally scoped to one independently played run at a time.
+It owns game rules, deterministic session progression, replay/save integrity,
+and optional neutral helpers for comparing finished runs. It does not own rooms,
+lobbies, authority runtimes, networking, or backend orchestration.
 
 ## Public Entry Points
-
-Use the package entrypoint that matches the layer you need:
 
 - `package:celestial_tripeaks/tripeaks_engine.dart`
   - core round/session engine
   - configs, presets, daily helpers, deal policy, hints
 - `package:celestial_tripeaks/tripeaks_replay.dart`
-  - replay logging, replay reconstruction, save/load envelopes
-- `package:celestial_tripeaks/tripeaks_multiplayer.dart`
-  - match orchestration, competitive scoring, match finalization
-- `package:celestial_tripeaks/tripeaks_authority.dart`
-  - authority runtime, reconnect, persistence contracts, in-memory store
-
-## Who This Is For
-
-- Beginners who want to test TriPeaks logic quickly via CLI
-- App developers who want a reusable game engine package
-- Backend developers who need deterministic replay/validation
+  - replay logging, reconstruction, save/load envelopes
+- `package:celestial_tripeaks/tripeaks_helpers.dart`
+  - neutral completed-run result objects
+  - deterministic post-run comparison and helper scoring
 
 ## Features
 
 - Classic TriPeaks core mechanics
-- Configurable rounds per session (`3`, `6`, `10`)
-- Scoring policies (moves, draws, invalid penalties, peak clear bonuses)
-- Undo (bounded, configurable)
-- Hint queries (deterministic)
-- Streak/combo state with logical ticks (no wall clock dependency)
-- Bonus slots (including deterministic tier-fixed anchors)
-- Strike timeout integration via explicit expiry action
-- Daily challenge deterministic seeding
-- Replay/event log (accepted/rejected attempts)
-- Stable versioned serialization for state/actions/configs/replay
+- Configurable multi-round sessions
+- Deterministic seeds and daily challenge helpers
+- Replay logging and replay-to-state verification
+- Versioned serialization and typed decode failures
 - Stable state/session/replay fingerprints
-- Save/load envelopes with fingerprint integrity validation
-- Deal policy with optional solvable-deal requirement
-- Minimal deterministic room foundation and live match orchestration
-- Server-authority layer for bootstrapped live matches
-- Match finalization + competitive scoring policy
+- Optional helper layer for comparing independent finished runs
 
-## Quick Start (Beginner)
-
-### 1) Install dependencies
+## Quick Start
 
 ```bash
 dart pub get
-```
-
-### 2) Run tests
-
-```bash
 dart test
 ```
 
-### 3) Start CLI sandbox
-
-```bash
-dart run bin/tripeaks_cli.dart --rounds=3 --bonus-spawn-policy=tier-fixed-rank
-```
-
-### 4) Use the fastest commands
-
-Inside CLI:
-- `auto 20` -> plays 20 deterministic helper steps
-- `fp` -> prints round/session/replay fingerprints
-- `verify` -> checks that session and replay fingerprints match
-- `replay save` -> saves replay to auto-generated file name
-- `replay load <file>` -> rebuilds session from replay
-- `help` -> full command list
-
-See full CLI tutorial: [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md)
-
-## Minimal Engine Usage (Code)
+## Engine Usage
 
 ```dart
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
@@ -102,7 +58,7 @@ void main() {
 }
 ```
 
-## Replay Usage (Code)
+## Replay Usage
 
 ```dart
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
@@ -132,106 +88,53 @@ void main() {
 }
 ```
 
-## Multiplayer / Authority Usage (Code)
+## Helper Usage
 
 ```dart
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
-import 'package:celestial_tripeaks/tripeaks_authority.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 
 void main() {
-  var room = RoomState.newRoom(
-    config: const RoomConfig(
-      roomId: 'room-1',
-      matchMode: MatchMode.realtime,
-      minMembers: 2,
-      maxMembers: 2,
-    ),
+  final session = TriPeaksSessionState.newSession(
+    ruleset: TriPeaksRuleset.threeRounds,
+    seed: 42,
   );
-  room = tryReduceRoom(room, const JoinRoomEvent(memberId: 'p1')).state;
-  room = tryReduceRoom(room, const JoinRoomEvent(memberId: 'p2')).state;
+  final result = CompletedSessionResult.fromSession(session);
 
-  final bootstrap = tryReduceRoom(
-    room,
-    const StartRoomMatchEvent(
-      requestedByMemberId: 'p1',
-      matchId: 'match-1',
-      matchSeed: 42,
-    ),
-  ).bootstrap!;
-
-  final runtime = AuthorityRuntime(
-    store: InMemoryAuthorityStore(),
-    initialMatchState: bootstrap.matchState,
+  final comparison = compareCompletedRuns(
+    <String, CompletedSessionResult>{'player-a': result},
   );
 
-  print(runtime);
+  print(comparison.rankings.first.entryId);
 }
 ```
 
-## Room Scope
+## Architectural Boundary
 
-The engine room layer is intentionally small. It owns only:
+Engine responsibilities:
 
-- deterministic membership
-- deterministic host selection and transfer
-- deterministic start validation
-- canonical room-to-match bootstrap
+- deterministic TriPeaks rules and reducers
+- deterministic seeds, presets, and validation
+- replay/save envelopes and fingerprinting
+- neutral completed-run helper utilities
 
-It does not own:
+App or backend responsibilities:
 
-- invites, moderation, bans, reporting
-- room discovery or listing metadata
-- presence / online-offline tracking
-- reconnection transport state
-- notifications
-- platform identity concerns
-- Firebase-specific fields or document schemas
+- room handling and seed distribution
+- presence, transport, and matchmaking
+- result submission and leaderboard flow
+- tournament or multiplayer orchestration
 
 ## Determinism Contract
 
-Same inputs => same outputs.
-
-Deterministic inputs are:
-- seed
-- ordered action/event sequence
-- all configs affecting behavior
+Same inputs produce the same outputs. Deterministic inputs are the seed, the
+ordered action sequence, and the configs that affect behavior.
 
 Not used inside engine logic:
+
 - `DateTime.now()`
-- timers
+- live timers
 - unseeded randomness
-- platform-dependent `hashCode` for determinism decisions
+- transport or platform state
 
-See: [docs/DETERMINISM.md](docs/DETERMINISM.md)
-
-## Stability and Versioning
-
-- DTOs are versioned (`schemaVersion`)
-- decode failures are typed (no exceptions for normal decode errors)
-- unsupported versions return typed failure unless migrated
-
-Release checklist: [RELEASE_READINESS.md](RELEASE_READINESS.md)
-
-## CI
-
-GitHub Actions workflow at:
-- `.github/workflows/ci.yml`
-
-Current gates:
-- format check
-- static analysis
-- test suite
-
-## Releases
-
-Private package releases are cut from git tags such as `v1.0.0-beta.3`.
-
-The release workflow:
-- requires the tag to match `pubspec.yaml`
-- requires a matching `CHANGELOG.md` entry
-- reruns format, analysis, and tests
-- runs `dart pub publish --dry-run` against a temporary release tree
-- creates a GitHub Release, marking prerelease tags as prereleases
-
-Detailed steps: [docs/release_process.md](docs/release_process.md)
+See [docs/DETERMINISM.md](docs/DETERMINISM.md).

@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Removed `tripeaks_multiplayer.dart` and `tripeaks_authority.dart`.
+- Re-centered the package on deterministic single-run gameplay, replay, and
+  validation.
+- Added `tripeaks_helpers.dart` for neutral completed-run DTOs and optional
+  post-run comparison and scoring helpers.
+- Removed room, live-match, and authority runtime models, reducers, tests, and
+  docs from the engine boundary.
+
 ## [1.0.0-rc.2] - 2026-04-14
 
 ### Added

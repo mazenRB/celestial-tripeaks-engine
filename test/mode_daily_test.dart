@@ -1,5 +1,5 @@
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 import 'package:celestial_tripeaks/tripeaks_replay.dart';
 import 'package:test/test.dart';
 
@@ -131,8 +131,7 @@ void main() {
       expect(invalid.scoreBreakdown.invalidPenaltyPoints, 0);
     });
 
-    test('bundle fields can be reused across session replay and match setup',
-        () {
+    test('bundle fields can be reused across session replay and helpers', () {
       final bundle = TriPeaksModeBundle.forPreset(
         TriPeaksModePreset.celestial,
       );
@@ -158,21 +157,7 @@ void main() {
         strikeTimerConfig: bundle.strikeTimerConfig,
         bonusSlotsConfig: bundle.bonusSlotsConfig,
       );
-      final match = MatchConfig(
-        matchMode: MatchMode.realtime,
-        matchId: 'mode-test',
-        matchSeed: 42,
-        maxPlayers: 2,
-        ruleset: bundle.ruleset,
-        scoreConfig: bundle.scoreConfig,
-        roundRulesConfig: bundle.roundRulesConfig,
-        roundTimerConfig: bundle.roundTimerConfig,
-        undoConfig: bundle.undoConfig,
-        streakConfig: bundle.streakConfig,
-        strikeTimerConfig: bundle.strikeTimerConfig,
-        bonusSlotsConfig: bundle.bonusSlotsConfig,
-        dealPolicyConfig: bundle.dealPolicyConfig,
-      );
+      final completed = CompletedSessionResult.fromSession(session);
 
       expect(session.ruleset, bundle.ruleset);
       expect(session.scoreConfig.toMap(), bundle.scoreConfig.toMap());
@@ -186,15 +171,13 @@ void main() {
         replay.roundTimerConfig.toMap(),
         bundle.roundTimerConfig.toMap(),
       );
-      expect(match.ruleset, bundle.ruleset);
-      expect(match.scoreConfig.toMap(), bundle.scoreConfig.toMap());
       expect(
-        match.roundTimerConfig.toMap(),
-        bundle.roundTimerConfig.toMap(),
+        completed.scoreConfig.toMap(),
+        bundle.scoreConfig.toMap(),
       );
       expect(
-        match.dealPolicyConfig.toMap(),
-        bundle.dealPolicyConfig.toMap(),
+        completed.roundTimerConfig.toMap(),
+        bundle.roundTimerConfig.toMap(),
       );
     });
   });

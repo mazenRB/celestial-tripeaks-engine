@@ -1,8 +1,7 @@
 import 'dart:io';
 
-import 'package:celestial_tripeaks/tripeaks_authority.dart';
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 import 'package:celestial_tripeaks/tripeaks_replay.dart';
 import 'package:test/test.dart';
 
@@ -45,52 +44,24 @@ void main() {
       expect(replayFingerprint(recorded.replay), isNotEmpty);
     });
 
-    test('multiplayer entrypoint supports room bootstrap', () {
-      var room = RoomState.newRoom(
-        config: const RoomConfig(
-          roomId: 'room-1',
-          matchMode: MatchMode.realtime,
-          minMembers: 2,
-          maxMembers: 2,
-        ),
+    test('helper entrypoint supports completed-run comparison', () {
+      final baseline = TriPeaksSessionState.newSession(
+        ruleset: TriPeaksRuleset.threeRounds,
+        seed: 42,
       );
-      room = tryReduceRoom(
-        room,
-        const JoinRoomEvent(memberId: 'p1'),
+      final better = tryReduceTriPeaksSession(
+        baseline,
+        const PlayRoundAction(DrawFromStockAction()),
       ).state;
-      room = tryReduceRoom(
-        room,
-        const JoinRoomEvent(memberId: 'p2'),
-      ).state;
-      final started = tryReduceRoom(
-        room,
-        const StartRoomMatchEvent(
-          requestedByMemberId: 'p1',
-          matchId: 'match-1',
-          matchSeed: 7,
-        ),
+      final result = compareCompletedRuns(
+        <String, CompletedSessionResult>{
+          'a': CompletedSessionResult.fromSession(baseline),
+          'b': CompletedSessionResult.fromSession(better),
+        },
       );
 
-      expect(started.isSuccess, isTrue);
-      expect(started.bootstrap, isNotNull);
-      expect(started.bootstrap!.matchState.players.length, 2);
-    });
-
-    test('authority entrypoint supports runtime construction', () {
-      final runtime = AuthorityRuntime(
-        store: InMemoryAuthorityStore(),
-        initialMatchState: MatchState.newMatch(
-          config: const MatchConfig(
-            matchMode: MatchMode.realtime,
-            matchId: 'runtime',
-            matchSeed: 9,
-            maxPlayers: 2,
-          ),
-          playerIds: const <String>['p1', 'p2'],
-        ),
-      );
-
-      expect(runtime, isA<AuthorityRuntime>());
+      expect(result.rankings, hasLength(2));
+      expect(result.rankings.first.entryId, 'b');
     });
 
     test('package docs avoid src imports in consumer examples', () {
@@ -99,7 +70,6 @@ void main() {
         'docs/DETERMINISM.md',
         'docs/FLUTTER_INTEGRATION.md',
         'docs/engine_api_guide.md',
-        'docs/authority_runtime_integration.md',
       ].map((path) => File(path).readAsStringSync()).join('\n');
 
       expect(docs.contains('package:celestial_tripeaks/src/'), isFalse);

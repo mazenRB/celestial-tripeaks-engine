@@ -1,139 +1,91 @@
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Competitive match scoring', () {
-    MatchState buildStartedMatch({
-      ScoreConfig scoreConfig = const ScoreConfig(),
+  group('Completed-run comparison helpers', () {
+    CompletedSessionResult buildRun({
+      required int seed,
+      required int draws,
+      required int roundsWon,
+      CompletedRunStatus status = CompletedRunStatus.completed,
     }) {
-      final config = MatchConfig(
-        matchMode: MatchMode.realtime,
-        matchId: 'comp',
-        matchSeed: 999,
-        maxPlayers: 2,
+      var session = TriPeaksSessionState.newSession(
         ruleset: TriPeaksRuleset.threeRounds,
-        scoreConfig: scoreConfig,
-        dealPolicyConfig: const DealPolicyConfig(mode: DealPolicyMode.random),
+        seed: seed,
+        scoreConfig: const ScoreConfig(pointsDrawFromStock: 10),
       );
-      return MatchState.newMatch(
-        config: config,
-        playerIds: const <String>['p1', 'p2'],
+      for (var i = 0; i < draws; i++) {
+        session = tryReduceTriPeaksSession(
+          session,
+          const PlayRoundAction(DrawFromStockAction()),
+        ).state;
+      }
+      return CompletedSessionResult(
+        schemaVersion: 1,
+        engineVersion: 1,
+        seed: seed,
+        ruleset: session.ruleset,
+        scoreConfig: session.scoreConfig,
+        roundRulesConfig: session.roundRulesConfig,
+        roundTimerConfig: session.roundTimerConfig,
+        undoConfig: session.undoConfig,
+        streakConfig: session.streakConfig,
+        strikeTimerConfig: session.strikeTimerConfig,
+        bonusSlotsConfig: session.bonusSlotsConfig,
+        status: status,
+        finalScore: session.cumulativeIncludingCurrentRoundScoreTotal,
+        finalFingerprint: sessionFingerprint(session),
+        roundsCompleted: roundsWon,
+        roundsWon: roundsWon,
+        roundsLost: 0,
+        roundsTimedOut: 0,
+        roundsAborted: 0,
       );
     }
 
-    test('first finisher receives configured firstFinishBonus', () {
-      var state = buildStartedMatch();
-
-      for (var i = 0; i < 3; i++) {
-        state = tryReduceMatch(
-          state,
-          const SubmitMatchActionEvent(
-            playerId: 'p1',
-            action: AbortRoundAction(reason: AbortReason.userSkip),
-          ),
-        ).state;
-      }
-      for (var i = 0; i < 3; i++) {
-        state = tryReduceMatch(
-          state,
-          const SubmitMatchActionEvent(
-            playerId: 'p2',
-            action: AbortRoundAction(reason: AbortReason.userSkip),
-          ),
-        ).state;
-      }
-
-      final result = computeMatchResults(
-        state,
-        const MatchScoringConfig(firstFinishBonus: 100),
+    test('higher score ranks first under score policy', () {
+      final result = compareCompletedRuns(
+        <String, CompletedSessionResult>{
+          'a': buildRun(seed: 999, draws: 1, roundsWon: 1),
+          'b': buildRun(seed: 999, draws: 3, roundsWon: 1),
+        },
       );
-      final p1 = result.placements.firstWhere((p) => p.playerId == 'p1');
-      final p2 = result.placements.firstWhere((p) => p.playerId == 'p2');
 
-      expect(p1.breakdown.firstFinishBonus, 100);
-      expect(p2.breakdown.firstFinishBonus, 0);
+      expect(result.rankings.first.entryId, 'b');
+      expect(result.rankings.first.breakdown.baseScore, 30);
     });
 
-    test('tie resolution follows tieBreakerPolicy', () {
-      var state = buildStartedMatch(
-        scoreConfig: const ScoreConfig(pointsDrawFromStock: 1),
-      );
-
-      for (var i = 0; i < 3; i++) {
-        state = tryReduceMatch(
-          state,
-          const SubmitMatchActionEvent(
-            playerId: 'p2',
-            action: PlayRoundAction(DrawFromStockAction()),
-          ),
-        ).state;
-      }
-      for (var i = 0; i < 3; i++) {
-        state = tryReduceMatch(
-          state,
-          const SubmitMatchActionEvent(
-            playerId: 'p1',
-            action: AbortRoundAction(reason: AbortReason.userSkip),
-          ),
-        ).state;
-      }
-
-      final finishOrderResult = computeMatchResults(
-        state,
-        const MatchScoringConfig(
-          tieBreakerPolicy: MatchTieBreakerPolicy.finishOrder,
-        ),
-      );
-      final scoreResult = computeMatchResults(
-        state,
-        const MatchScoringConfig(
-          tieBreakerPolicy: MatchTieBreakerPolicy.score,
+    test('winsThenScore prefers more wins before score', () {
+      final result = compareCompletedRuns(
+        <String, CompletedSessionResult>{
+          'a': buildRun(seed: 999, draws: 3, roundsWon: 1),
+          'b': buildRun(seed: 999, draws: 1, roundsWon: 2),
+        },
+        config: const CompetitionRankingConfig(
+          tieBreakerPolicy: CompetitionTieBreakerPolicy.winsThenScore,
         ),
       );
 
-      expect(finishOrderResult.placements.first.playerId, 'p1');
-      expect(scoreResult.placements.first.playerId, 'p2');
+      expect(result.rankings.first.entryId, 'b');
     });
 
-    test(
-      'players with same finish order are ranked by score when policy uses score',
-      () {
-        var state = buildStartedMatch(
-          scoreConfig: const ScoreConfig(pointsDrawFromStock: 1),
-        );
+    test('completed runs can receive completion and placement bonuses', () {
+      final result = compareCompletedRuns(
+        <String, CompletedSessionResult>{
+          'a': buildRun(seed: 999, draws: 1, roundsWon: 1),
+          'b': buildRun(seed: 999, draws: 3, roundsWon: 1),
+        },
+        config: const CompetitionRankingConfig(
+          completionBonus: 25,
+          placementBonuses: <int, int>{1: 50, 2: 10},
+        ),
+      );
 
-        state = tryReduceMatch(
-          state,
-          const SubmitMatchActionEvent(
-            playerId: 'p2',
-            action: PlayRoundAction(DrawFromStockAction()),
-          ),
-        ).state;
-        state = tryReduceMatch(
-          state,
-          const SubmitMatchActionEvent(
-            playerId: 'p2',
-            action: PlayRoundAction(DrawFromStockAction()),
-          ),
-        ).state;
-
-        final finishOrderResult = computeMatchResults(
-          state,
-          const MatchScoringConfig(
-            tieBreakerPolicy: MatchTieBreakerPolicy.finishOrder,
-          ),
-        );
-        final scoreResult = computeMatchResults(
-          state,
-          const MatchScoringConfig(
-            tieBreakerPolicy: MatchTieBreakerPolicy.score,
-          ),
-        );
-
-        expect(finishOrderResult.placements.first.playerId, 'p1');
-        expect(scoreResult.placements.first.playerId, 'p2');
-      },
-    );
+      expect(result.rankings.first.entryId, 'b');
+      expect(result.rankings.first.breakdown.completionBonus, 25);
+      expect(result.rankings.first.breakdown.placementBonus, 50);
+      expect(result.rankings.last.breakdown.placementBonus, 10);
+    });
   });
 }
