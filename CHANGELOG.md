@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0-rc.3] - 2026-04-18
+
 ### Changed
 
 - Removed `tripeaks_multiplayer.dart` and `tripeaks_authority.dart`.
