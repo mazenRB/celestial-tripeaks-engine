@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] - 2026-06-13
+
+### Added
+
+- Exposed `activeMultiplier` getter on `TriPeaksState` (via the `TriPeaksStateQueries` extension) as a single source of truth for the presentation layer.
+
 ## [1.0.0-rc.3] - 2026-04-18
 
 ### Changed

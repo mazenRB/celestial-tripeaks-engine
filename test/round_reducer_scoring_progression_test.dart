@@ -335,5 +335,69 @@ void main() {
       expect(draw.scoreBreakdown.peakBonusPoints, 0);
       expect(draw.scoreBreakdown.drawPoints, 0);
     });
+
+    test('activeMultiplier query exposes active multiplier on TriPeaksState',
+        () {
+      // 1. Standard mode (streak-based multiplier)
+      var state = TriPeaksState.newGame(
+        deck: buildPeakBonusDeck(),
+        scoreConfig: const ScoreConfig(
+          streakStepSize: 2,
+          multiplierStepIncrement: 1,
+          multiplierMax: 5,
+        ),
+      );
+
+      // Current Streak = 0 -> multiplier = 1
+      expect(state.activeMultiplier, 1);
+
+      // First card (index 18) matches seven of spades.
+      // 18 is six of clubs, adjacent to seven.
+      state = tryReduceTriPeaks(state, const RemoveTableauCardAction(18)).state;
+      expect(state.streakState.currentStreak, 1);
+      expect(state.activeMultiplier, 1);
+
+      // Second card (index 19) is five of diamonds, adjacent to six.
+      state = tryReduceTriPeaks(state, const RemoveTableauCardAction(19)).state;
+      expect(state.streakState.currentStreak, 2);
+      expect(state.activeMultiplier, 2);
+
+      // 2. Time bonus mode
+      var timeState = TriPeaksState.newGame(
+        deck: buildStreakUnlockDeck(),
+        scoreConfig: const ScoreConfig(
+          multiplierMode: ScoreMultiplierMode.timeBonus,
+          timeBonusSecondsPerMove: 2,
+          timeBonusMaxSeconds: 10,
+        ),
+      );
+
+      // Default remainingSeconds = 0, so multiplier is 1
+      expect(timeState.activeMultiplier, 1);
+
+      // Perform a move with tick: 1
+      timeState = tryReduceTriPeaks(
+        timeState,
+        const RemoveTableauCardAction(18),
+        tick: 1,
+      ).state;
+
+      // remainingSeconds = 2, stepCount = 0 -> multiplier = 2 + 0 = 2
+      expect(timeState.timeBonusTimerState.remainingSeconds, 2);
+      expect(timeState.timeBonusTimerState.stepCount, 0);
+      expect(timeState.activeMultiplier, 2);
+
+      // Perform another move with tick: 2
+      timeState = tryReduceTriPeaks(
+        timeState,
+        const RemoveTableauCardAction(19),
+        tick: 2,
+      ).state;
+
+      // remainingSeconds = 4, stepCount = 1 -> multiplier = 2 + 1 = 3
+      expect(timeState.timeBonusTimerState.remainingSeconds, 4);
+      expect(timeState.timeBonusTimerState.stepCount, 1);
+      expect(timeState.activeMultiplier, 3);
+    });
   });
 }

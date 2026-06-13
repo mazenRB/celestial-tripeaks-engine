@@ -44,6 +44,14 @@ extension TriPeaksStateQueries on TriPeaksState {
     return roundTimerConfig.enabled && configuredRoundDurationSeconds > 0;
   }
 
+  /// The active multiplier currently in effect for scoring.
+  int get activeMultiplier => _computeActiveMultiplier(
+        scoreConfig,
+        timeBonusTimerState.remainingSeconds,
+        timeBonusTimerState.stepCount,
+        streakState.currentStreak,
+      );
+
   /// Remaining stock size.
   int get stockCount => stock.length;
 
