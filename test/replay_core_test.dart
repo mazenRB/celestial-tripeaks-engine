@@ -290,5 +290,20 @@ void main() {
         DecodeFailureCode.unsupportedSchemaVersion,
       );
     });
+
+    test('replay action toSessionAction fails when tableauIndex is missing for removeTableauCard', () {
+      final dto = ReplayActionDto(kind: ReplayActionKind.removeTableauCard);
+
+      expect(
+        () => dto.toSessionAction(),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'tableauIndex is required for removeTableauCard.',
+          ),
+        ),
+      );
+    });
   });
 }
