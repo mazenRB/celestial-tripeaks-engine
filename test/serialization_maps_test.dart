@@ -297,6 +297,27 @@ void main() {
       );
     });
 
+    test('Card.tryFromMap rejects invalid rank/suit combinations', () {
+      final missingKindDecoded = Card.tryFromMap(<String, dynamic>{
+        'schemaVersion': 1,
+        'type': 'card',
+        'rank': 'INVALID',
+        'suit': 'INVALID',
+      });
+      expect(missingKindDecoded.isSuccess, isFalse);
+      expect(missingKindDecoded.error?.code, DecodeFailureCode.invalidPayload);
+
+      final normalKindDecoded = Card.tryFromMap(<String, dynamic>{
+        'schemaVersion': 1,
+        'type': 'card',
+        'cardKind': 'normal',
+        'rank': 'INVALID',
+        'suit': 'INVALID',
+      });
+      expect(normalKindDecoded.isSuccess, isFalse);
+      expect(normalKindDecoded.error?.code, DecodeFailureCode.invalidPayload);
+    });
+
     test('anchor card map is stable (golden)', () {
       const anchor = Card.anchor(Rank.queen);
       expect(
