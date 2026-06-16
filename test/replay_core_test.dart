@@ -291,7 +291,9 @@ void main() {
       );
     });
 
-    test('replay action toSessionAction fails when tableauIndex is missing for removeTableauCard', () {
+    test(
+        'replay action toSessionAction fails when tableauIndex is missing for removeTableauCard',
+        () {
       final dto = ReplayActionDto(kind: ReplayActionKind.removeTableauCard);
 
       expect(
