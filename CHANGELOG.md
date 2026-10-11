@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Reducer results report newly cleared peak IDs and the points awarded for
+  each peak.
+
 ## [1.0.0-rc.4] - 2026-06-13
 
 ### Added
