@@ -207,6 +207,7 @@ final class TriPeaksReduceResult {
     required this.scoreDelta,
     required this.scoreBreakdown,
     required this.appliedMultiplier,
+    this.peakClearedEvents = const <PeakClearedEvent>[],
     this.error,
   });
 
@@ -227,6 +228,9 @@ final class TriPeaksReduceResult {
   ///
   /// This mirrors the resulting state's [ScoreState.currentMultiplier].
   final int appliedMultiplier;
+
+  /// Peaks newly cleared by this action and the points awarded for each.
+  final List<PeakClearedEvent> peakClearedEvents;
 
   /// Error details when reduction fails.
   final TriPeaksRuleError? error;
