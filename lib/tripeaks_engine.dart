@@ -43,6 +43,7 @@ export 'src/tripeaks_engine_internal.dart'
         RoundResult,
         TriPeaksRuleError,
         TriPeaksReduceResult,
+        PeakClearedEvent,
         TriPeaksSessionError,
         TriPeaksSessionReduceResult,
         TriPeaksRuleset,

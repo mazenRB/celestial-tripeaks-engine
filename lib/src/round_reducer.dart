@@ -158,6 +158,10 @@ TriPeaksReduceResult tryReduceTriPeaks(
         scoreDelta: applied.scoreDelta + bonus,
         scoreBreakdown: breakdown,
         appliedMultiplier: applied.appliedMultiplier,
+        peakClearedEvents: _peakClearedEventsBetween(
+          preprocessed,
+          nextState,
+        ),
       );
     }
   }
@@ -166,6 +170,31 @@ TriPeaksReduceResult tryReduceTriPeaks(
     scoreDelta: applied.scoreDelta,
     scoreBreakdown: applied.scoreBreakdown,
     appliedMultiplier: applied.appliedMultiplier,
+    peakClearedEvents: _peakClearedEventsBetween(
+      preprocessed,
+      applied.state,
+    ),
+  );
+}
+
+List<PeakClearedEvent> _peakClearedEventsBetween(
+  TriPeaksState previous,
+  TriPeaksState next,
+) {
+  final newlyClearedPeakIds = next.clearedPeaksAwarded
+      .difference(
+        previous.clearedPeaksAwarded,
+      )
+      .toList()
+    ..sort();
+
+  return List<PeakClearedEvent>.unmodifiable(
+    newlyClearedPeakIds.map(
+      (peakId) => PeakClearedEvent(
+        peakId: peakId,
+        pointsAwarded: next.scoreConfig.pointsPeakCleared,
+      ),
+    ),
   );
 }
 

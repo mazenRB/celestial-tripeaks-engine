@@ -19,6 +19,7 @@ part 'round_config_timers.dart';
 part 'round_config_bonus.dart';
 part 'round_config_hint.dart';
 part 'engine_types.dart';
+part 'round_peak_cleared_event.dart';
 part 'engine_types_actions.dart';
 part 'mode_bundle.dart';
 part 'serialization.dart';
