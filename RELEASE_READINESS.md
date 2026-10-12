@@ -25,6 +25,12 @@ This checklist is the minimum bar before publishing a release.
   - decode recomputes and verifies fingerprint
   - corruption returns typed `corruptSave`
   - unsupported version returns typed failure
+- Multiplayer determinism checks pass:
+  - Async rejects any roster other than two players
+  - Live waits for all round results and starts existing configured timers
+  - Skip votes and intermission expiry advance the same shared round
+  - Room/match snapshots and ordered event replays round-trip exactly
+  - Authority rejects mismatched seed/rules and incomplete sessions
 
 ## Versioning discipline
 

@@ -12,6 +12,14 @@ This guide focuses on practical integration using the package entrypoints.
   - replay, replay verification, save/load
 - `package:celestial_tripeaks/tripeaks_helpers.dart`
   - neutral completed-run results and helper comparison utilities
+- `package:celestial_tripeaks/tripeaks_multiplayer.dart`
+  - optional versioned rooms, Async 1v1, and Live round coordination
+- `package:celestial_tripeaks/tripeaks_authority.dart`
+  - optional replay-based multiplayer submission verification
+
+Multiplayer is separate from the core engine import. See
+[`multiplayer_api.md`](multiplayer_api.md) for its room lifecycle, timer
+configuration, and application/backend responsibilities.
 
 ## Core Types You Will Use
 

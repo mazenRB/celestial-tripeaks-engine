@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0-rc.6] - 2026-10-12
+
+### Added
+
+- Optional versioned room and multiplayer APIs with independent per-player
+  sessions and shared-seed matches.
+- Async 1v1 deadlines and Live round barriers with configurable intermissions
+  and skip votes, reusing existing per-round timer presets.
+- Replay-based authority verification and complete/per-round match results.
+
 ## [1.0.0-rc.5] - 2026-10-11
 
 ### Added

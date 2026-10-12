@@ -1,6 +1,6 @@
 # Documentation Index
 
-Last updated: 2026-04-17
+Last updated: 2026-10-12
 
 ## Start Here
 
@@ -17,6 +17,9 @@ Last updated: 2026-04-17
 - `engine_api_guide.md`
   - Audience: Engine integrators
   - Purpose: core types, reducer usage, integration recipes
+- `multiplayer_api.md`
+  - Audience: app and backend engineers integrating Async or Live play
+  - Purpose: room lifecycle, synchronized round progression, and verification
 
 - `serialization_and_versioning.md`
   - Audience: Engine integrators, platform/backend engineers

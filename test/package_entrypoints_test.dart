@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
 import 'package:celestial_tripeaks/tripeaks_helpers.dart';
+import 'package:celestial_tripeaks/tripeaks_multiplayer.dart';
+import 'package:celestial_tripeaks/tripeaks_authority.dart';
 import 'package:celestial_tripeaks/tripeaks_replay.dart';
 import 'package:test/test.dart';
 
@@ -62,6 +64,35 @@ void main() {
 
       expect(result.rankings, hasLength(2));
       expect(result.rankings.first.entryId, 'b');
+    });
+
+    test('optional multiplayer entrypoints remain separate from core API', () {
+      final room = RoomState.newRoom(
+        config: RoomConfig(
+          roomId: 'entrypoint-room',
+          hostPlayerId: 'host',
+          matchConfig: const MatchConfig(
+            matchMode: MatchMode.asynchronous,
+            matchId: 'template',
+            matchSeed: 0,
+            playerIds: <String>['host', 'guest'],
+            ruleset: TriPeaksRuleset.oneRound,
+          ),
+        ),
+      );
+
+      expect(room.status, RoomStatus.open);
+      expect(
+        verifyMatchSubmission(
+          config: room.config.matchConfig,
+          playerId: 'host',
+          replay: ReplaySession.newSession(
+            seed: 0,
+            ruleset: TriPeaksRuleset.oneRound,
+          ),
+        ).failure!.code,
+        MatchSubmissionFailureCode.sessionIncomplete,
+      );
     });
 
     test('package docs avoid src imports in consumer examples', () {

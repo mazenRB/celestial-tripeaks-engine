@@ -1,33 +1,33 @@
-# Celestial TriPeaks (Pure Dart Engine)
+# Celestial TriPeaks Engine
 
-A deterministic, pure Dart Solitaire TriPeaks engine with replay and validation
-support.
-
-This package is intentionally scoped to one independently played run at a time.
-It owns game rules, deterministic session progression, replay/save integrity,
-and optional neutral helpers for comparing finished runs. It does not own rooms,
-lobbies, authority runtimes, networking, or backend orchestration.
+A pure Dart TriPeaks engine with deterministic game rules, multi-round sessions,
+replay verification, and optional multiplayer state reducers. It contains no
+Flutter or UI dependencies.
 
 ## Public Entry Points
 
-- `package:celestial_tripeaks/tripeaks_engine.dart`
-  - core round/session engine
-  - configs, presets, daily helpers, deal policy, hints
-- `package:celestial_tripeaks/tripeaks_replay.dart`
-  - replay logging, reconstruction, save/load envelopes
-- `package:celestial_tripeaks/tripeaks_helpers.dart`
-  - neutral completed-run result objects
-  - deterministic post-run comparison and helper scoring
+- `tripeaks_engine.dart` — core round and session rules, presets, timers, and
+  deterministic game data.
+- `tripeaks_replay.dart` — replay recording, reconstruction, and save/load.
+- `tripeaks_helpers.dart` — completed-run comparison and neutral score helpers.
+- `tripeaks_multiplayer.dart` — optional rooms, Async 1v1 matches, and Live
+  round coordination.
+- `tripeaks_authority.dart` — replay-based verification of player submissions.
 
-## Features
+The multiplayer entry points are opt-in. Importing the core engine does not
+require consumers to use room or match orchestration.
 
-- Classic TriPeaks core mechanics
-- Configurable multi-round sessions
-- Deterministic seeds and daily challenge helpers
-- Replay logging and replay-to-state verification
-- Versioned serialization and typed decode failures
-- Stable state/session/replay fingerprints
-- Optional helper layer for comparing independent finished runs
+## Multiplayer Model
+
+Each participant plays an independent game with the match's shared seed and
+rules. Async is a full-match 1v1. Live rooms wait for every player to finish the
+current round, then start a configurable intermission and advance together.
+Live uses the engine's existing per-round timer configuration. Apps and
+backends provide networking, identity, storage, notifications, and host-driven
+clock events.
+
+See [the multiplayer API guide](docs/multiplayer_api.md) for lifecycle details,
+configuration examples, and authority boundaries.
 
 ## Quick Start
 
@@ -36,7 +36,7 @@ dart pub get
 dart test
 ```
 
-## Engine Usage
+## Single-Player Usage
 
 ```dart
 import 'package:celestial_tripeaks/tripeaks_engine.dart';
@@ -46,95 +46,20 @@ void main() {
     ruleset: TriPeaksRuleset.threeRounds,
     seed: 42,
   );
-
   final result = tryReduceTriPeaksSession(
     session,
     const PlayRoundAction(DrawFromStockAction()),
-    tick: 1,
   );
-
   session = result.state;
   print(session.currentRound.scoreState.totalScore);
 }
 ```
 
-## Replay Usage
-
-```dart
-import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_replay.dart';
-
-void main() {
-  var session = TriPeaksSessionState.newSession(
-    ruleset: TriPeaksRuleset.threeRounds,
-    seed: 42,
-  );
-  var replay = TriPeaksReplay.newSession(
-    seed: 42,
-    ruleset: TriPeaksRuleset.threeRounds,
-  );
-
-  final recorded = recordAction(
-    replay,
-    session,
-    const PlayRoundAction(DrawFromStockAction()),
-    tick: 1,
-  );
-
-  replay = recorded.replay;
-  session = recorded.state;
-  print(replayFingerprint(replay));
-  print(sessionFingerprint(session));
-}
-```
-
-## Helper Usage
-
-```dart
-import 'package:celestial_tripeaks/tripeaks_engine.dart';
-import 'package:celestial_tripeaks/tripeaks_helpers.dart';
-
-void main() {
-  final session = TriPeaksSessionState.newSession(
-    ruleset: TriPeaksRuleset.threeRounds,
-    seed: 42,
-  );
-  final result = CompletedSessionResult.fromSession(session);
-
-  final comparison = compareCompletedRuns(
-    <String, CompletedSessionResult>{'player-a': result},
-  );
-
-  print(comparison.rankings.first.entryId);
-}
-```
-
-## Architectural Boundary
-
-Engine responsibilities:
-
-- deterministic TriPeaks rules and reducers
-- deterministic seeds, presets, and validation
-- replay/save envelopes and fingerprinting
-- neutral completed-run helper utilities
-
-App or backend responsibilities:
-
-- room handling and seed distribution
-- presence, transport, and matchmaking
-- result submission and leaderboard flow
-- tournament or multiplayer orchestration
-
 ## Determinism Contract
 
-Same inputs produce the same outputs. Deterministic inputs are the seed, the
-ordered action sequence, and the configs that affect behavior.
+Same seed, state, actions, and configuration produce the same game data. The
+engine does not read wall-clock time, use transport state, or generate
+unseeded randomness. Timer progress and expiry enter as explicit actions.
 
-Not used inside engine logic:
-
-- `DateTime.now()`
-- live timers
-- unseeded randomness
-- transport or platform state
-
-See [docs/DETERMINISM.md](docs/DETERMINISM.md).
+See [docs/DETERMINISM.md](docs/DETERMINISM.md) and
+[docs/multiplayer_api.md](docs/multiplayer_api.md).

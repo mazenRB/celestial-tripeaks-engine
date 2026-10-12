@@ -1,23 +1,23 @@
 # Serialization and Versioning
 
-Last updated: 2026-04-17
+Last updated: 2026-10-12
 
 ## Rules
 
-- every public payload includes `schemaVersion`
-- payload families include `type` when a decoder needs explicit discrimination
-- decoders return `DecodeResult<T>` with typed failures
-- unsupported schemas return
-  `DecodeFailureCode.unsupportedSchemaVersion`
+- Public payloads include `schemaVersion`.
+- Payload families include `type` when a decoder needs explicit discrimination.
+- Decoders return `DecodeResult<T>` with typed failures.
+- Unsupported schemas return `DecodeFailureCode.unsupportedSchemaVersion`.
+- Changes to public payloads need an additive decode path or a schema bump and
+  migration plan.
 
 ## Public Payload Families
 
-- core round, session, config, and action payloads
-- replay and save envelopes
-- neutral helper payloads under `tripeaks_helpers.dart`
+- Core round, session, config, and action payloads.
+- Replay and save envelopes.
+- Completed-run helper results.
+- Optional multiplayer room, match, event, and result payloads.
 
-## Boundary
-
-Serialization in this package is for deterministic gameplay and post-run helper
-contracts only. Room state, transport payloads, presence metadata, and backend
-documents are intentionally outside the engine boundary.
+Multiplayer state is deterministic game data, not transport or backend
+metadata. Presence, authenticated identities, reconnect state, and storage
+schemas remain application responsibilities.
