@@ -14,6 +14,8 @@ Last updated: 2026-04-17
 - serialization round-trip tests
 - replay parity tests
 - helper-layer tests for completed-run comparison and scoring
+- multiplayer room, Async match, Live barrier, and skip-vote reducer tests
+- authority replay-verification and multiplayer serialization/replay tests
 
 ## Guardrails
 

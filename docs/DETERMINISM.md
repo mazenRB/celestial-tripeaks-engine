@@ -6,6 +6,8 @@ Import guidance:
 
 - `tripeaks_engine.dart` for state/session fingerprints
 - `tripeaks_replay.dart` for replay logging and replay fingerprints
+- `tripeaks_multiplayer.dart` for deterministic room/match event reducers
+- `tripeaks_authority.dart` for replay-based result verification
 
 ## Deterministic Inputs
 
@@ -15,6 +17,7 @@ A state transition is fully determined by:
 - action/event
 - configs
 - explicit logical tick/sequence where required
+- explicit elapsed-time actions for Async deadlines and Live intermissions
 
 ## Deterministic Outputs
 
@@ -66,6 +69,6 @@ On decode:
 ## What To Avoid in Engine Logic
 
 - no `DateTime.now()`
-- no internal timers
+- no wall-clock timer reads
 - no unseeded randomness
 - no platform `hashCode` for deterministic decisions

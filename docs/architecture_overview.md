@@ -1,47 +1,37 @@
 # Architecture Overview
 
-Last updated: 2026-04-17
+Last updated: 2026-10-12
 
-Celestial TriPeaks is a deterministic single-run game engine. It owns the
-rules for one player session, replay and validation primitives, and a small
-neutral helper surface for post-run processing.
+The package separates deterministic game mechanics, optional match
+orchestration, replay verification, and application services.
 
 ## Public Entry Points
 
-- `tripeaks_engine.dart`
-  - round and session state
-  - reducers, configs, presets, daily seeding, hints, deal policy
-- `tripeaks_replay.dart`
-  - replay recording, reconstruction, save/load envelopes
-- `tripeaks_helpers.dart`
-  - completed-run DTOs
-  - deterministic comparison and helper scoring across finished runs
+- `tripeaks_engine.dart` owns round/session rules, presets, scoring, and
+  deterministic timer actions.
+- `tripeaks_replay.dart` records and reconstructs one player's session.
+- `tripeaks_helpers.dart` compares completed independent runs.
+- `tripeaks_multiplayer.dart` provides optional room and match reducers.
+- `tripeaks_authority.dart` verifies a submitted session by replay.
 
-## Boundary
+The single-player engine remains usable without importing multiplayer APIs.
+Each match participant has a private deterministic session. Async compares
+two complete independent runs; Live coordinates multiple independent runs at
+round barriers.
 
-Engine-owned concerns:
+## Engine and Application Responsibilities
 
-- deterministic gameplay rules
-- deterministic seeds and config-driven tuning
-- replay reconstruction and fingerprint validation
-- serializable public state, actions, and helper payloads
+The engine owns serializable game and match data, deterministic reducers,
+shared seed/rule handling, round and intermission progression, and replay
+validation. It does not own UI, presentation strings, animation, wall-clock
+reads, networking, identity, presence, invitations, storage, or notifications.
 
-App or backend concerns:
+Hosts supply explicit timer actions and authenticate incoming events. Apps may
+choose persistence, transport, and display behavior without reimplementing
+TriPeaks scoring or match progression.
 
-- room handling and matchmaking
-- presence, transport, and identity
-- result submission and leaderboard storage
-- tournament flow and multiplayer orchestration
+## Determinism
 
-## Core Invariants
-
-- same seed + same config + same ordered actions => same state
-- same replay log => same reconstructed state
-- public payloads are versioned and serializable
-- decode failures are typed instead of thrown for normal bad payloads
-
-## Extension Guidance
-
-- add new mechanics by extending core state, config, and reducer logic
-- keep orchestration outside the engine boundary
-- add non-core post-run utilities under `tripeaks_helpers.dart`
+Every state transition is derived from its prior state, action, seed, and
+configuration. No reducer reads wall-clock time or uses unseeded randomness.
+Public room, match, event, and result payloads are versioned and serializable.
